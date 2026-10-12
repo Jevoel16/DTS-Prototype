@@ -90,6 +90,41 @@ function sslPaths(): array {
 }
 
 /**
+ * Shell-ready openssl command. On Windows: OPENSSL_PATH in .env (exe or its folder),
+ * then PATH, then the copy bundled with Git for Windows.
+ */
+function opensslCommand(): string {
+    if (!isWindows()) {
+        return 'openssl';
+    }
+
+    $candidates = [];
+    if ($configured = envValue('OPENSSL_PATH')) {
+        $candidates[] = is_dir($configured) ? rtrim($configured, '\\/') . '\\openssl.exe' : $configured;
+    }
+    foreach ($candidates as $candidate) {
+        if (is_file($candidate)) {
+            return escapeshellarg(realpath($candidate));
+        }
+    }
+
+    $where = trim((string) shell_exec('where openssl 2>NUL'));
+    if ($where !== '') {
+        return escapeshellarg(strtok($where, "\r\n"));
+    }
+
+    foreach ([getenv('ProgramFiles'), getenv('ProgramFiles(x86)'), getenv('LOCALAPPDATA') . '\\Programs'] as $base) {
+        foreach (['\\Git\\usr\\bin\\openssl.exe', '\\Git\\mingw64\\bin\\openssl.exe'] as $suffix) {
+            if ($base && is_file($base . $suffix)) {
+                return escapeshellarg($base . $suffix);
+            }
+        }
+    }
+
+    throw new RuntimeException('openssl not found. Install Git for Windows, add openssl to PATH, or set OPENSSL_PATH in .env.');
+}
+
+/**
  * Generate (or regenerate) the self-signed SSL cert with SANs covering:
  *   - localhost
  *   - 127.0.0.1
@@ -101,10 +136,11 @@ function sslPaths(): array {
 function ensureSslCert(string $lanIp): void {
     ['cert' => $certPath, 'key' => $keyPath] = sslPaths();
     $sudo = isWindows() ? '' : 'sudo ';
+    $openssl = opensslCommand();
 
     // Check if the existing cert already covers this LAN IP
     if (file_exists($certPath)) {
-        $certInfo = shell_exec('openssl x509 -in ' . escapeshellarg($certPath) . ' -noout -text');
+        $certInfo = shell_exec("$openssl x509 -in " . escapeshellarg($certPath) . ' -noout -text');
         if ($certInfo && str_contains($certInfo, "IP Address:$lanIp")) {
             echo "✅ SSL cert already valid for $lanIp — skipping regeneration.\n";
             return;
@@ -142,7 +178,7 @@ function ensureSslCert(string $lanIp): void {
     IP.2  = $lanIp
     CNF);
 
-    $cmd = "{$sudo}openssl req -x509 -nodes -days 825 -newkey rsa:2048"
+    $cmd = "{$sudo}{$openssl} req -x509 -nodes -days 825 -newkey rsa:2048"
          . ' -keyout ' . escapeshellarg($keyPath)
          . ' -out ' . escapeshellarg($certPath)
          . ' -config ' . escapeshellarg($opensslCnf)
@@ -234,13 +270,24 @@ function startQueueWorker() {
 
 /**
  * Locate nginx.exe: NGINX_PATH in .env (exe or its folder), then C:\nginx, then PATH.
+ * Folders are also searched up to two levels deep, since extracting the nginx zip
+ * usually nests it (e.g. C:\nginx\nginx-1.30.5\nginx-1.30.5\nginx.exe).
  */
 function findNginxWindows(): ?string {
+    $dirs = [];
     $candidates = [];
     if ($configured = envValue('NGINX_PATH')) {
-        $candidates[] = is_dir($configured) ? rtrim($configured, '\\/') . '\\nginx.exe' : $configured;
+        if (is_dir($configured)) {
+            $dirs[] = rtrim($configured, '\\/');
+        } else {
+            $candidates[] = $configured;
+        }
     }
-    $candidates[] = 'C:\\nginx\\nginx.exe';
+    $dirs[] = 'C:\\nginx';
+
+    foreach ($dirs as $dir) {
+        array_push($candidates, "$dir\\nginx.exe", ...glob("$dir/*/nginx.exe"), ...glob("$dir/*/*/nginx.exe"));
+    }
 
     foreach ($candidates as $candidate) {
         if (is_file($candidate)) {

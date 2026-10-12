@@ -236,6 +236,7 @@ All settings are read from `.env` in the project root. The `DB_*` and `APP_DEBUG
 | `DB_PASSWORD` | *(empty)* | MySQL password |
 | `APP_DEBUG` | `false` | Show PHP errors in the browser. **Development only.** |
 | `NGINX_PATH` | `C:\nginx` | *Windows only.* Path to `nginx.exe` or its folder (falls back to `PATH`) |
+| `OPENSSL_PATH` | *(auto)* | *Windows only.* Path to `openssl.exe` or its folder (falls back to `PATH`, then Git for Windows' bundled copy) |
 | `APP_URL` | `https://localhost:8000` | Base URL used by the `seed:dev` HTTP seeder. Use `http://localhost:8000` with the built-in server. |
 
 For production sizing and InnoDB tuning, see [Hardware Specs & MySQL Tuning](documentation/HARDWARE_SPECS.md).
