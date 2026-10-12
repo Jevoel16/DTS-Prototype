@@ -47,113 +47,40 @@ Homestead.yaml
 homestead.box
 homestead.vagrant
 
-# --- backup-laravel ---
-/backup-laravel/auth.json
-/backup-laravel/public/build/
-/backup-laravel/public/hot/
-/backup-laravel/public/storage/
-/backup-laravel/storage/*.key
-/backup-laravel/vendor/
-/backup-laravel/lang/
-/backup-laravel/dumps/
-/backup-laravel/dist/
-/backup-laravel/sources/
-/backup-laravel/old/
-/backup-laravel/commit.md
-/backup-laravel/GEMINI.md
-/backup-laravel/FINDINGS.md
-/backup-laravel/database/database.sqlite
-/backup-laravel/database/database.sqlite-journal
-/backup-laravel/database/*.sqlite*
+# --- App ---
+/auth.json
+/public/build/
+/public/hot/
+/public/storage/
+/storage/*.key
+/vendor/
+/lang/
+/storage/pail/
+/dumps/
+/dist/
+/sources/
+/old/
+/commit.md
+/GEMINI.md
+/FINDINGS.md
+/cache/
 
-/backup-laravel/database/database_backups/*
-!/backup-laravel/database/database_backups/.gitkeep
+/storage/app/reports/*.csv
+/storage/reports/*.xlsx
+/storage/cache/*.sqlite*
+/storage/app/backups/*
 
-/backup-laravel/paper/references/*
-/backup-laravel/paper/TEMPLATES/*
-/backup-laravel/paper/Templates (converted)/
-/backup-laravel/paper/\[DRAFT] Thesis nilang Jove.md
-/backup-laravel/paper/PITCH_SCRIPT.md
-/backup-laravel/paper/ITE193/*
+/database/database.sqlite
+/database/database.sqlite-journal
+/storage/database.sqlite
 
-# Laravel directories to keep
-/backup-laravel/bootstrap/cache/*
-!/backup-laravel/bootstrap/cache/.gitkeep
-/backup-laravel/storage/logs/*
-!/backup-laravel/storage/logs/.gitkeep
-/backup-laravel/storage/pail/*
-!/backup-laravel/storage/pail/.gitkeep
+/database/database_backups/*
+!/database/database_backups/.gitkeep
 
-/backup-laravel/storage/app/*
-!/backup-laravel/storage/app/private/
-!/backup-laravel/storage/app/public/
-!/backup-laravel/storage/app/.gitkeep
-
-/backup-laravel/storage/app/private/*
-!/backup-laravel/storage/app/private/.gitkeep
-
-/backup-laravel/storage/app/public/*
-!/backup-laravel/storage/app/public/.gitkeep
-
-# Framework storage
-/backup-laravel/storage/framework/compiled.php
-/backup-laravel/storage/framework/config.php
-/backup-laravel/storage/framework/down
-/backup-laravel/storage/framework/events.scanned.php
-/backup-laravel/storage/framework/maintenance.php
-/backup-laravel/storage/framework/routes.php
-/backup-laravel/storage/framework/routes.scanned.php
-/backup-laravel/storage/framework/schedule-*
-/backup-laravel/storage/framework/services.json
-
-/backup-laravel/storage/framework/cache/*
-!/backup-laravel/storage/framework/cache/data/
-!/backup-laravel/storage/framework/cache/.gitkeep
-
-/backup-laravel/storage/framework/cache/data/*
-!/backup-laravel/storage/framework/cache/data/.gitkeep
-
-/backup-laravel/storage/framework/sessions/*
-!/backup-laravel/storage/framework/sessions/.gitkeep
-/backup-laravel/storage/framework/testing/*
-!/backup-laravel/storage/framework/testing/.gitkeep
-/backup-laravel/storage/framework/views/*
-!/backup-laravel/storage/framework/views/.gitkeep
-
-# --- working-php ---
-/working-php/auth.json
-/working-php/public/build/
-/working-php/public/hot/
-/working-php/public/storage/
-/working-php/storage/*.key
-/working-php/vendor/
-/working-php/lang/
-/working-php/storage/pail/
-/working-php/dumps/
-/working-php/dist/
-/working-php/sources/
-/working-php/old/
-/working-php/commit.md
-/working-php/GEMINI.md
-/working-php/FINDINGS.md
-/working-php/cache/
-
-/working-php/storage/app/reports/*.csv
-/working-php/storage/reports/*.xlsx
-/working-php/storage/cache/*.sqlite*
-/working-php/storage/app/backups/*
-
-/working-php/database/database.sqlite
-/working-php/database/database.sqlite-journal
-/working-php/storage/database.sqlite
-
-/working-php/database/database_backups/*
-!/working-php/database/database_backups/.gitkeep
-
-/working-php/paper/references/*
-/working-php/paper/TEMPLATES/*
-/working-php/paper/Templates (converted)/
-/working-php/paper/\[DRAFT] Thesis nilang Jove.md
-/working-php/paper/PITCH_SCRIPT.md
-/working-php/paper/ITE193/*
+/paper/references/*
+/paper/TEMPLATES/*
+/paper/Templates (converted)/
+/paper/\[DRAFT] Thesis nilang Jove.md
+/paper/PITCH_SCRIPT.md
+/paper/ITE193/*
 /temp

@@ -1,1 +1,0 @@
-<img src="{{ asset('images/logoipsum-411.png') }}" alt="DepEd Logo" style="height: 40px;">
