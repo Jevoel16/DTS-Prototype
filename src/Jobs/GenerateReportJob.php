@@ -3,9 +3,7 @@
 namespace App\Jobs;
 
 use App\Core\Database;
-use OpenSpout\Writer\XLSX\Writer;
-use OpenSpout\Common\Entity\Style\Style;
-use OpenSpout\Common\Entity\Row;
+use App\Services\ReleasedReportQuery;
 
 class GenerateReportJob
 {
@@ -36,40 +34,10 @@ class GenerateReportJob
             $reportJob = $db->query("SELECT created_at FROM report_jobs WHERE id = :id", ['id' => $this->reportJobId])->fetch();
             $jobCreatedAt = $reportJob['created_at'] ?? date('Y-m-d H:i:s');
 
-            $where = ["d.status = 'completed'", "d.released_by_user_id > 0", "d.updated_at <= :job_created_at"];
-            $params = [':dept_id' => $departmentId, ':job_created_at' => $jobCreatedAt];
-            
-            $join = "INNER JOIN users u ON d.released_by_user_id = u.id AND u.department_id = :dept_id
-                     LEFT JOIN purposes p ON d.purpose_id = p.id";
-
-            if (!empty($this->filters['date'])) {
-                $where[] = "DATE(d.released_at) = :date";
-                $params[':date'] = $this->filters['date'];
-            }
-            if (!empty($this->filters['search'])) {
-                $where[] = "(d.tracking_code LIKE :search OR json_unquote(json_extract(d.guest_info, '$.name')) LIKE :search2)";
-                $params[':search'] = '%' . $this->filters['search'] . '%';
-                $params[':search2'] = '%' . $this->filters['search'] . '%';
-            }
-            if (!empty($this->filters['purpose']) && $this->filters['purpose'] !== 'all') {
-                $where[] = "p.name = :purpose";
-                $params[':purpose'] = $this->filters['purpose'];
-            }
-            if (!empty($this->filters['submitter'])) {
-                $where[] = "LOWER(json_unquote(json_extract(d.guest_info, '$.name'))) LIKE :submitter";
-                $params[':submitter'] = '%' . strtolower($this->filters['submitter']) . '%';
-            }
-
-            $whereSql = implode(' AND ', $where);
+            $query = ReleasedReportQuery::build($departmentId, $jobCreatedAt, $this->filters);
 
             // Count total matching documents up to job creation timestamp
-            $countSql = "
-                SELECT COUNT(*) as total
-                FROM documents d
-                {$join}
-                WHERE {$whereSql}
-            ";
-            $countStmt = $db->query($countSql, $params);
+            $countStmt = $db->query("SELECT COUNT(*) as total FROM {$query['from']} WHERE {$query['where']}", $query['params']);
             $totalCount = (int) $countStmt->fetch()['total'];
 
             if ($totalCount === 0) {

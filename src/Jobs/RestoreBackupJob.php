@@ -23,13 +23,6 @@ class RestoreBackupJob
             return;
         }
 
-        $config = require BASE_PATH . '/src/Config/config.php';
-        $dbConfig = $config['database'];
-        $host = escapeshellarg($dbConfig['host']);
-        $user = escapeshellarg($dbConfig['user']);
-        $pass = escapeshellarg($dbConfig['password']);
-        $dbname = escapeshellarg($dbConfig['dbname']);
-
         // Extract
         $zip = new \ZipArchive();
         $sqlFile = null;
@@ -42,17 +35,14 @@ class RestoreBackupJob
         if ($sqlFile && file_exists($backupDir . '/' . $sqlFile)) {
             $filePath = $backupDir . '/' . $sqlFile;
             
-            // Restore DB using MYSQL_PWD environment variable to suppress password warnings
-            $envPrefix = $dbConfig['password'] !== '' ? "MYSQL_PWD=" . escapeshellarg($dbConfig['password']) . " " : "";
-            $command = "{$envPrefix}mysql -h {$host} -u {$user} {$dbname} < " . escapeshellarg($filePath) . " 2>&1";
-            exec($command, $output, $returnCode);
-
-            if ($returnCode !== 0) {
-                throw new \Exception("Database restore failed: " . implode("\n", $output));
+            try {
+                MysqlCli::run('mysql', [], $filePath);
+            } catch (\Throwable $e) {
+                throw new \Exception("Database restore failed: " . $e->getMessage());
+            } finally {
+                // Never leave a plain-text dump lying next to the zips
+                @unlink($filePath);
             }
-            
-            // Cleanup extracted SQL file
-            unlink($filePath);
         }
     }
 }

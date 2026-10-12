@@ -54,7 +54,7 @@ class AuthController
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['department_id'] = $user['department_id'];
-            $_SESSION['private_key'] = $user['private_key']; // Required for client-side signing
+            $_SESSION['private_key'] = $user['private_key'];
 
             if ($user['department_id']) {
                 $deptStmt = $db->query("SELECT name FROM departments WHERE id = :id", [':id' => $user['department_id']]);

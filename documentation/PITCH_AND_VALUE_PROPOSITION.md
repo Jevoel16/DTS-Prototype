@@ -76,7 +76,7 @@ Under high intake volume, guest kiosks often suffer from race conditions where s
 #### 4. Container-Native Async Queue & Internal Scheduler
 The background daemon (`console.php`) operates without relying on host system `cron` daemons:
 - **Parallel Worker Dispatch:** Spawns asynchronous worker subprocesses (`runner.php`) to process background jobs (backups, report generation, integrity checks).
-- **Internal Scheduler:** Periodically samples DB performance metrics (every 5 min), backfills departmental turnaround metrics (every 30 min), rolls up historical metrics (every 24 hrs), and runs response cache garbage collection (hourly).
+- **Internal Scheduler:** Periodically samples DB performance metrics (every 5 min), backfills departmental turnaround metrics (every 30 min), rolls up historical metrics (every 24 hrs), expires pending submissions older than 3 days (every 24 hrs), and garbage-collects the response and database caches (hourly).
 - **Graceful Signal Interception:** Utilizes `pcntl` signal handling (`SIGINT`, `SIGTERM`) to finish active jobs before shutting down, preventing queue state corruption.
 
 ---
@@ -91,10 +91,11 @@ The background daemon (`console.php`) operates without relying on host system `c
 +-----------------------------------------------------------------------------------+
 |                            DOCUMENT HASH CHAIN LOG ENTRY                          |
 +-----------------------------------------------------------------------------------+
-|  1. State Hash      = SHA-256( TrackingCode || Title || GuestInfo || Route )     |
-|  2. Signature       = Ed25519_Sign( UserPrivateKey, ActionText || StateHash )    |
-|  3. Block Hash      = SHA-256( DocID || UserID || Action || PrevHash || StateHash |
-|                                   || Signature || Timestamp )                     |
+|  1. State Hash      = SHA-256( TrackingCode || Title || GuestInfo || District     |
+|                                   || Department || PurposeID || Route )           |
+|  2. Signature       = Ed25519_Sign( UserPrivateKey, ActionText || StateHash )     |
+|  3. Block Hash      = SHA-256( DocID || UserID || Action || Timestamp             |
+|                                   || PrevHash || StateHash || Signature )         |
 |  4. Snapshot Payload = JSON_Encode( Complete Document Row State )                 |
 +-----------------------------------------------------------------------------------+
 ```
@@ -111,7 +112,7 @@ The system uses distinct cryptographic primitives for specific security guarante
 | :--- | :--- | :--- |
 | **Data Integrity** | SHA-256 Hashing | Micro-sharded hash chain (`previous_hash` binding) |
 | **Authenticity & Non-Repudiation** | Ed25519 Digital Signatures | Detached Sodium signature over `ActionText \| StateHash` |
-| **Key Confidentiality** | Argon2id + AES-256-CBC | Encrypted private key wrapping using 6-digit user Security PIN |
+| **Key Confidentiality** | Argon2id + AES-256-CBC | Encrypted private key wrapping using the user's Security PIN (min. 6 characters) |
 
 - **State Hash:** SHA-256 calculated over normalized document metadata (tracking code, title, submitter info, district, department, purpose ID, finalized route).
 - **Ed25519 Signatures:** Keypairs generated using `libsodium`. The private key is wrapped with AES-256-CBC using an Argon2id-derived key from the user's PIN. The signature binds the actor's identity directly to the exact state hash of the document at that instant.
@@ -181,7 +182,7 @@ A major source of workplace stress in public offices is the "ghost folder" probl
    +-----------------------------------------------------------------+
    |                    PUBLIC GUEST PORTAL                          |
    |                                                                 |
-   |  Enter Tracking Code:  [ DEPED-ILIGAN-2026-X9A2 ]    [ TRACK ]  |
+   |  Enter Tracking Code:  [ DEPED-3F9A27C1B4     ]    [ TRACK ]    |
    +-----------------------------------------------------------------+
                                     │
                                     ▼

@@ -39,15 +39,16 @@ async function setupDatabase() {
             multipleStatements: true // Required to run the full SQL file
         });
 
-        // 1. Load and execute database.sql
+        // 1. Create/select the database from .env, then load database.sql into it
+        const dbName = connection.escapeId(process.env.DB_DATABASE);
+        await connection.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`);
+        await connection.query(`USE ${dbName}`);
+
         const sqlFilePath = path.join(__dirname, '../../database.sql');
         const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
-        
+
         console.log('🧹 Dropping existing tables and rebuilding schema (including document_snapshot)...');
         await connection.query(sqlContent);
-        
-        // Make sure we are using the new DB
-        await connection.query(`USE ${process.env.DB_DATABASE}`);
 
         console.log('🌱 Seeding foundational data...');
 

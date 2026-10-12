@@ -16,7 +16,19 @@ if (file_exists($envPath)) {
     }
 }
 
+// Real environment variables (systemd, CI, one-off CLI runs) override .env
+foreach (['DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'APP_DEBUG'] as $key) {
+    $value = getenv($key);
+    if ($value !== false) {
+        $env[$key] = $value;
+    }
+}
+
 return [
+    'app' => [
+        // Show PHP errors in the browser only when APP_DEBUG=true
+        'debug' => filter_var($env['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOL),
+    ],
     'database' => [
         'host' => $env['DB_HOST'],
         'port' => $env['DB_PORT'],

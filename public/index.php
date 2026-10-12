@@ -15,20 +15,22 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Match Laravel's default timezone so hashes align properly
+// Hashes in document_logs include timestamps, so the timezone must never change
 date_default_timezone_set('Asia/Manila');
-
-// Setup Error Reporting (Development Mode)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 // Base Path Definition
 define('BASE_PATH', dirname(__DIR__));
 
-// Require Composer Autoloader & Custom Helpers
+// Composer autoloader (also loads src/helpers.php via autoload.files)
 require BASE_PATH . '/vendor/autoload.php';
-require BASE_PATH . '/src/helpers.php';
+
+// Error display follows APP_DEBUG in .env (errors are always logged)
+$appConfig = require BASE_PATH . '/src/Config/config.php';
+$debug = $appConfig['app']['debug'];
+ini_set('display_errors', $debug ? '1' : '0');
+ini_set('display_startup_errors', $debug ? '1' : '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
 
 use App\Core\Router;
 
@@ -371,13 +373,6 @@ $router->post('/documents/scan', [App\Controllers\DocumentController::class, 'sc
 // Dispatch the Request
 $uri = $_SERVER['REQUEST_URI'] ?? '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
-file_put_contents(sys_get_temp_dir() . '/router.log', "URI: $uri, Method: $method, Path: " . (parse_url($uri, PHP_URL_PATH) ?? '/') . "\n", FILE_APPEND);
-
-// If running PHP built-in server and file exists, return false to serve it statically
-if (php_sapi_name() === 'cli-server' && is_file(__DIR__ . parse_url($uri, PHP_URL_PATH))) {
-    return false;
-}
 
 $router->dispatch($uri, $method);
 

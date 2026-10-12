@@ -1,5 +1,8 @@
 # DTS Hardware Requirements & Performance Specifications
 
+> [!WARNING]
+> **Legacy (Laravel) documentation — not applicable to the current PHP app.** Kept for history and the research paper. Current docs: [documentation/](../).
+
 ## Summary
 A technical guide detailing the hardware infrastructure required to run the Document Tracking System (DTS) effectively. This document focuses on **high-concurrency** scenarios, ensuring the system remains responsive under heavy load (1,000,000+ records and hundreds of simultaneous users). It provides both minimum and recommended specifications based on the system's memory-intensive architecture.
 

@@ -22,21 +22,23 @@ So how does the system verify that a log entry hasn't been tampered with if it c
 
 Think of a hash as a **recipe fingerprint**. 
 
-When a log entry is created, the system takes 5 distinct ingredients sitting on the page:
+When a log entry is created, the system takes 7 distinct ingredients sitting on the page:
 1. **Document ID** (e.g., `100`)
-2. **User ID** (e.g., `5`)
+2. **User ID** (e.g., `5`; empty for automatic system actions)
 3. **Action** (e.g., `"Received"`)
-4. **Timestamp** (e.g., `"2026-07-27 15:45:00"`)
-5. **The fingerprint of the previous log entry** (the chain link)
+4. **Timestamp** (e.g., `"2026-07-27T15:45:00+08:00"`)
+5. **The fingerprint of the previous log entry** (the chain link; the very first entry uses `genesis_hash`)
+6. **The document state fingerprint**: a hash of the document's own fields (tracking code, title, submitter details, district, department, purpose and finalized route) at that moment
+7. **The user's digital signature** over the action and state (see section 3)
 
-It puts those 5 ingredients into a mathematical blender (`SHA-256`) and gets a 64-character fingerprint: `9a8f3b...`  
+It puts those 7 ingredients into a mathematical blender (`SHA-256`) and gets a 64-character fingerprint: `9a8f3b...`  
 It writes `9a8f3b...` at the bottom of the log row as the **Block Hash**.
 
 ### How the System Verifies It Later (The Audit Check)
 When an administrator runs an integrity check tomorrow, the system does **not** "decode" `9a8f3b...`. 
 
 Instead, it does this:
-1. It reads the 5 ingredients still written in the database table for that row.
+1. It reads the 7 ingredients still written in the database table for that row.
 2. It puts those exact ingredients into the blender again to make a **fresh smoothie**.
 3. It compares the new smoothie to the stored fingerprint:
    - **Blender output today:** `9a8f3b...`
@@ -61,7 +63,7 @@ A hash only proves *what* data was written. A **digital signature** proves *who*
 When a staff member (e.g., Alice) processes a document:
 1. The system glues two pieces of information together into one exact sentence:  
    `"Received | StateHash123"`
-2. Alice enters her secret 6-digit PIN. This unlocks her personal **digital wax stamp** (her Ed25519 private key).
+2. Alice enters her secret PIN (at least 6 characters). This unlocks her personal **digital wax stamp** (her Ed25519 private key).
 3. The system stamps her digital signature onto that exact sentence.
 
 ### How Anyone Verifies the Signature Later

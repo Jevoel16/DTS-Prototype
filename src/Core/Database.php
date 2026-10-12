@@ -17,6 +17,11 @@ class Database
      */
     private function __construct()
     {
+        $this->connect();
+    }
+
+    private function connect(): void
+    {
         $config = require BASE_PATH . '/src/Config/config.php';
         $dbConfig = $config['database'];
 
@@ -36,9 +41,22 @@ class Database
             // raw database credentials directly to the user/logs on connection failure.
             $this->connection = new PDO($dsn, $dbConfig['user'], $dbConfig['password'], $options);
         } catch (PDOException $e) {
-            // In a real production app, we would log this securely and show a generic error
             error_log("Database Connection Failed: " . $e->getMessage());
             throw new Exception("Database Connection Failed. Please check system logs.");
+        }
+    }
+
+    /**
+     * Long-running processes (console.php) call this before each poll: MySQL drops
+     * idle connections after wait_timeout ("server has gone away"), so reconnect if needed.
+     */
+    public function ensureConnected(): void
+    {
+        try {
+            $this->connection->query('SELECT 1');
+        } catch (PDOException $e) {
+            error_log("Database connection lost, reconnecting: " . $e->getMessage());
+            $this->connect();
         }
     }
 

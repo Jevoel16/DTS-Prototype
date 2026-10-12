@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-10-12 16:45
+
+**Version:** 1.25.0-Release+202610121645
+
+### Changed
+- Retired the Laravel codebase and moved the PHP app from `working-php/` to the repository root (commit `2b314a1`).
+- NGINX now runs on **Windows and Linux** from one template (`nginx/site.conf`): Windows uses a pool of 4 `php-cgi` processes and a project-local config/certificate under `storage/`; Linux keeps PHP-FPM. Added gzip, 30-day browser caching for static assets and a 300 s FastCGI timeout.
+- `composer run dev` on Windows starts NGINX + php-cgi + the queue worker (restarting the worker after its job/memory limit) and stops all of them on Ctrl+C; without NGINX it falls back to `php -S` with the new `public/router.php`. `composer run prod` now also starts the worker (`--no-worker` to opt out).
+- Department metrics backfill rebuilds only the last 2 days every 30 minutes (`--full` for seeders) instead of truncating all history.
+- `IntakeController`, `StatisticsController` and `GenerateReportJob` now share `DocumentQueryService` / `ReleasedReportQuery` instead of duplicated SQL.
+- Real environment variables override `.env`; new `APP_DEBUG` (error display, default off) and `NGINX_PATH` keys; `seed.js` honours `APP_URL`.
+- `database.sql` no longer hard-codes `deped_dts`; `seed:prod` creates and uses `DB_DATABASE`.
+- Stopped tracking the 100 MB `from_dts/dts_docroutes*` dumps in git (files stay on disk); `package-lock.json` is now tracked.
+- Rewrote the README and user manuals to match the PHP code; added `ARCHITECTURE.md`, `HARDWARE_SPECS.md` and `QUANTUM_SAFETY.md` for the PHP app; marked `documentation/laravel-era/` as legacy.
+
+### Added
+- `composer run migrate` (`scripts/migrate.php`): idempotent upgrade adding indexes on `jobs`, `notifications` (composite unread), `departments.name`, `purposes.name`, `documents.updated_at`, `cache.expiration`, and dropping unused Laravel tables.
+- `composer run css`, `composer run seed:legacy [-- file.csv]`.
+- Hourly garbage collection of expired rows in the `cache` table.
+
+### Fixed
+- Database backups and restores on Windows: the POSIX `MYSQL_PWD=… mysqldump` syntax failed under `cmd.exe`, so every backup was a 100-byte error message. New `MysqlCli` helper runs the tools without a shell and passes the DB port.
+- Backup download/restore/delete returned 404 on the PHP built-in server (URLs ending in a filename).
+- Officer intake date filter in `DocumentQueryService` referenced a non-existent `max_logs.handled_at` column.
+- Failed-job delete buttons redirected to the non-existent `/system-health` page.
+- Queue worker job claim race (now checks the claiming `UPDATE`'s row count) and "MySQL server has gone away" after idle periods.
+- `composer run proxy` pointed `cloudflared` at `http://` while NGINX serves HTTPS.
+
+### Removed
+- Unused `symfony/cache` and `phpmailer/phpmailer` packages and the `SMTP_*`, `PIN_CACHE_DURATION`, `DB_CONNECTION` env keys.
+- ~1 MB of unused libsodium JS (and the encrypted private key it exposed to every page), a duplicate Chart.js include, unused fonts, a per-request debug log write.
+- Dead controller methods, `DocumentPolicyMiddleware`, orphaned admin views, and broken `scripts/test_*` files.
+- Unused tables `job_batches`, `password_reset_tokens`, `sessions`, `cache_locks`, `prediction_keywords`.
+
+### Performance
+- Tracking-form PDF embeds a 480 px seal: PDF 568 KB → 101 KB, generation ~0.86 s → ~0.44 s.
+- Tailwind CSS is built minified (61 KB → 46 KB).
+- Date filters use index-friendly ranges instead of `DATE(column)`.
+
 ## 2026-07-28 00:17
 
 **Version:** 1.24.0-Release+202607280017
@@ -31,19 +70,19 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Updated notification toast messages across document lifecycle actions to dynamically include the document tracking code (e.g. `Document DEPED-XXXXXXXX marked as completed and released.`).
-- Fixed root cause in [`AuthMiddleware.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Middleware/AuthMiddleware.php) where premature `session_write_close()` calls during request middleware execution froze PHP session files and discarded controller `$_SESSION['success']` flash alerts.
-- Extended [`ReleasingController.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Controllers/ReleasingController.php) and [`DocumentController.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Controllers/DocumentController.php) (`finalizeIntake`, `decline`, `release`) to query the document tracking code for toast notification consistency.
-- Extended [`pjax-router.js`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/public/js/pjax-router.js) and [`app.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/layouts/app.php) to synchronize toast modals and notification dropdown lists across client-side page swaps with console debugging (`[DTS Notif System]` and `[DTS PJAX Router]`).
+- Fixed root cause in [`AuthMiddleware.php`](src/Middleware/AuthMiddleware.php) where premature `session_write_close()` calls during request middleware execution froze PHP session files and discarded controller `$_SESSION['success']` flash alerts.
+- Extended [`ReleasingController.php`](src/Controllers/ReleasingController.php) and [`DocumentController.php`](src/Controllers/DocumentController.php) (`finalizeIntake`, `decline`, `release`) to query the document tracking code for toast notification consistency.
+- Extended [`pjax-router.js`](public/js/pjax-router.js) and [`app.php`](src/Views/layouts/app.php) to synchronize toast modals and notification dropdown lists across client-side page swaps with console debugging (`[DTS Notif System]` and `[DTS PJAX Router]`).
 
 ### Added
-- Added `getUnread()` endpoint to [`NotificationController.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Controllers/NotificationController.php) and registered `GET /api/notifications/unread` route in [`index.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/public/index.php).
+- Added `getUnread()` endpoint to [`NotificationController.php`](src/Controllers/NotificationController.php) and registered `GET /api/notifications/unread` route in [`index.php`](public/index.php).
 
 ## 2026-07-27 17:16
 
 **Version:** 1.23.2-Alpha+202607271716
 
 ### Fixed
-- Re-generated `working-php/scripts/seeders/names_data.json` with 100% ASCII compliance by applying Unicode NFD normalization in `build-names-json.py`, transliterating Spanish accents and tildes (`ñ` -> `n`, `á` -> `a`, `í` -> `i`) to reflect real-world fast data entry conventions (*Garcia*, *Rodriguez*, *Fernandez*, *Lopez*, *Perez*, *Sanchez*, *Martinez*, *de Leon*, *Diaz*).
+- Re-generated `scripts/seeders/names_data.json` with 100% ASCII compliance by applying Unicode NFD normalization in `build-names-json.py`, transliterating Spanish accents and tildes (`ñ` -> `n`, `á` -> `a`, `í` -> `i`) to reflect real-world fast data entry conventions (*Garcia*, *Rodriguez*, *Fernandez*, *Lopez*, *Perez*, *Sanchez*, *Martinez*, *de Leon*, *Diaz*).
 - Added a name combination blacklist (`isBlacklisted()`) and 10-attempt re-sampling loop to `fast-seed.php` and `seed.js` to filter out unusual or culturally sensitive generated name pairs (e.g. `"Mama Mary"`, `"Mary Mama"`, `"Papa Jesus"`).
 
 ### Added
@@ -54,8 +93,8 @@ All notable changes to this project will be documented in this file.
 **Version:** 1.23.1-Alpha+202607271659
 
 ### Fixed
-- Fixed document back routing and browser history state corruption across [`pjax-router.js`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/public/js/pjax-router.js), [`show-document.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/general/show-document.php), [`document-hash-chain.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/general/document-hash-chain.php), and [`DocumentController.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Controllers/DocumentController.php).
-- Resolved duplicate `history.pushState()` calls during `popstate` events in [`pjax-router.js`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/public/js/pjax-router.js) that broke `history.back()`.
+- Fixed document back routing and browser history state corruption across [`pjax-router.js`](public/js/pjax-router.js), [`show-document.php`](src/Views/general/show-document.php), [`document-hash-chain.php`](src/Views/general/document-hash-chain.php), and [`DocumentController.php`](src/Controllers/DocumentController.php).
+- Resolved duplicate `history.pushState()` calls during `popstate` events in [`pjax-router.js`](public/js/pjax-router.js) that broke `history.back()`.
 - Implemented `sessionStorage` origin URL tracking (`dts_doc_origin`) to return users to their exact entry page (including active filter query parameters and table pagination state) when navigating back from document details.
 
 ### Added
@@ -78,7 +117,7 @@ All notable changes to this project will be documented in this file.
 **Version:** 1.22.1-Alpha+202607271346
 
 ### Fixed
-- Added missing **Document Title** (`$document['title']`) field to the Document Information metadata card in [`show-document.php`](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/general/show-document.php).
+- Added missing **Document Title** (`$document['title']`) field to the Document Information metadata card in [`show-document.php`](src/Views/general/show-document.php).
 
 ### Added
 - N/A
@@ -113,8 +152,8 @@ All notable changes to this project will be documented in this file.
 - Replaced generic placeholder document titles (`"Fast Seeded Doc X"`, `"Automated Test Document Y"`) in `fast-seed.php` and `seed.js` with realistic DepEd (Department of Education) document titles specific to each document's purpose.
 
 ### Added
-- Added `working-php/scripts/seeders/titles_data.json` containing 5 domain-appropriate document titles for each of the 23 default database purposes (115 titles total).
-- Updated `working-php/scripts/seeders/seed.js` and `working-php/scripts/seeders/fast-seed.php` to fetch purpose names from the database and sample realistic titles matching each document's purpose.
+- Added `scripts/seeders/titles_data.json` containing 5 domain-appropriate document titles for each of the 23 default database purposes (115 titles total).
+- Updated `scripts/seeders/seed.js` and `scripts/seeders/fast-seed.php` to fetch purpose names from the database and sample realistic titles matching each document's purpose.
 
 ## 2026-07-27 10:43
 
@@ -125,21 +164,21 @@ All notable changes to this project will be documented in this file.
 - Fixed form input loss on validation failure in `login.php` and `welcome.php`. Valid fields now retain previously entered values across redirects while invalid fields that triggered constraint errors are cleared out and highlighted with high-visibility red borders (`border-red-500 ring-2 ring-red-500/20`) and inline error messages.
 
 ### Added
-- Added `working-php/scripts/seeders/build-names-json.py` to extract 1,000 forenames and 994 lastnames with population weights from `pop_names.csv` (ISO-8859-1) into a shared UTF-8 dataset `working-php/scripts/seeders/names_data.json`.
-- Integrated `WeightedNameGenerator` class into `working-php/scripts/seeders/fast-seed.php` and `working-php/scripts/seeders/seed.js` using roulette-wheel sampling and a multi-word forename distribution (80% single, 18% double, 2% triple first names) to produce believable Filipino names with accented characters intact (*García*, *Rodríguez*, *Fernández*, *López*, *Pérez*, *Sánchez*, *Martínez*, *de León*).
-- Added global form flash helpers (`has_error`, `old`, `error_msg`, `field_error_class`, `clear_form_flash`) in `working-php/src/helpers.php` to handle session flash inputs (`$_SESSION['old']`) and field error maps (`$_SESSION['field_errors']`).
+- Added `scripts/seeders/build-names-json.py` to extract 1,000 forenames and 994 lastnames with population weights from `pop_names.csv` (ISO-8859-1) into a shared UTF-8 dataset `scripts/seeders/names_data.json`.
+- Integrated `WeightedNameGenerator` class into `scripts/seeders/fast-seed.php` and `scripts/seeders/seed.js` using roulette-wheel sampling and a multi-word forename distribution (80% single, 18% double, 2% triple first names) to produce believable Filipino names with accented characters intact (*García*, *Rodríguez*, *Fernández*, *López*, *Pérez*, *Sánchez*, *Martínez*, *de León*).
+- Added global form flash helpers (`has_error`, `old`, `error_msg`, `field_error_class`, `clear_form_flash`) in `src/helpers.php` to handle session flash inputs (`$_SESSION['old']`) and field error maps (`$_SESSION['field_errors']`).
 
 ## 2026-07-26 15:06
 
 **Version:** 1.18.0-Release+202607261506
 
 ### Fixed
-- Fixed navigation flow in `working-php/src/Views/layouts/app.php` where clicking the header logo directed authenticated users back to the public guest portal (`/`). Updated the logo link to `/dashboard` so logged-in users return to their role-specific dashboard.
-- Standardized top-right header button styling in `working-php/src/Views/layouts/guest.php` using the uniform `table-filters.php` design tokens (`bg-accent-1`, uppercase tracking, focus ring, `h-[38px]`).
+- Fixed navigation flow in `src/Views/layouts/app.php` where clicking the header logo directed authenticated users back to the public guest portal (`/`). Updated the logo link to `/dashboard` so logged-in users return to their role-specific dashboard.
+- Standardized top-right header button styling in `src/Views/layouts/guest.php` using the uniform `table-filters.php` design tokens (`bg-accent-1`, uppercase tracking, focus ring, `h-[38px]`).
 
 ### Added
 - Added a dedicated "Staff Sign In" (or "Dashboard" when logged in) button to the public guest layout (`guest.php`) next to the theme toggle, providing administrative staff and officers with a direct login path from the guest landing page.
-- Added multi-stakeholder pitch documentation (`working-php/documentation/PITCH_AND_VALUE_PROPOSITION.md`) featuring targeted technical value propositions for IT Administrators, Government Decision Makers, Cryptographers/Auditors, Office Workers, and General Citizens.
+- Added multi-stakeholder pitch documentation (`documentation/PITCH_AND_VALUE_PROPOSITION.md`) featuring targeted technical value propositions for IT Administrators, Government Decision Makers, Cryptographers/Auditors, Office Workers, and General Citizens.
 
 ## 2026-07-26 12:06
 
@@ -218,31 +257,31 @@ All notable changes to this project will be documented in this file.
 **Version:** 1.16.14-Alpha+202607251834
 
 ### Fixed
-- Updated UI styling and layout responsive alignment for database performance metrics in [system-overview.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/admin/system-overview.php).
-- Refactored background job queue processors ([CreateBackupJob.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Jobs/CreateBackupJob.php), [GenerateReportJob.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Jobs/GenerateReportJob.php), [RestoreBackupJob.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Jobs/RestoreBackupJob.php)) and seeder digital key reset routines ([fast-seed.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/scripts/seeders/fast-seed.php), [seed.js](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/scripts/seeders/seed.js)).
+- Updated UI styling and layout responsive alignment for database performance metrics in [system-overview.php](src/Views/admin/system-overview.php).
+- Refactored background job queue processors ([CreateBackupJob.php](src/Jobs/CreateBackupJob.php), [GenerateReportJob.php](src/Jobs/GenerateReportJob.php), [RestoreBackupJob.php](src/Jobs/RestoreBackupJob.php)) and seeder digital key reset routines ([fast-seed.php](scripts/seeders/fast-seed.php), [seed.js](scripts/seeders/seed.js)).
 
 ### Added
-- Integrated "Average Turnaround Time (TAT) by Department" detailed view modal in [dashboard.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/admin/dashboard.php) powered by [admin-dashboard.js](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/public/js/admin-dashboard.js).
-- Added departmental load vs time and database performance metrics calculations in [AdminAnalyticsService.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Services/AdminAnalyticsService.php) and [DatabasePerformanceService.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Services/DatabasePerformanceService.php).
+- Integrated "Average Turnaround Time (TAT) by Department" detailed view modal in [dashboard.php](src/Views/admin/dashboard.php) powered by [admin-dashboard.js](public/js/admin-dashboard.js).
+- Added departmental load vs time and database performance metrics calculations in [AdminAnalyticsService.php](src/Services/AdminAnalyticsService.php) and [DatabasePerformanceService.php](src/Services/DatabasePerformanceService.php).
 
 ## 2026-07-23 16:38
 
 **Version:** 1.16.13-Alpha+202607231638
 
 ### Fixed
-- Standardized document navigation back URL resolution in `DocumentController` (`$_SESSION['doc_return_url']`) and added smart `history.back()` behavior to the "Back to Document" header link in [document-hash-chain.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/general/document-hash-chain.php).
+- Standardized document navigation back URL resolution in `DocumentController` (`$_SESSION['doc_return_url']`) and added smart `history.back()` behavior to the "Back to Document" header link in [document-hash-chain.php](src/Views/general/document-hash-chain.php).
 - Capped duration calculations in `AdminAnalyticsService::getProcessingHotspotsData` to prevent overflow and negative time intervals.
 
 ### Added
 - Added "Peak Intake Hours" bar chart telemetry on the Admin Dashboard (`/api/admin-dashboard/peak-intake-hours`) to visualize document submission distribution across 24-hour time slots.
-- Integrated one-click copy buttons for cryptographic hashes in [document-hash-chain.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/general/document-hash-chain.php) and exception stack traces in [system-overview.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/src/Views/admin/system-overview.php).
+- Integrated one-click copy buttons for cryptographic hashes in [document-hash-chain.php](src/Views/general/document-hash-chain.php) and exception stack traces in [system-overview.php](src/Views/admin/system-overview.php).
 
 ## 2026-07-23 14:28
 
 **Version:** 1.16.12-Alpha+202607231428
 
 ### Fixed
-- Refactored [CRYPTOGRAPHIC_LOGS_EXPLAINED.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/CRYPTOGRAPHIC_LOGS_EXPLAINED.md) from dialogue format into a low-level → high-level → key-takeaways explanation; updated the root README documentation blurb to match.
+- Refactored [CRYPTOGRAPHIC_LOGS_EXPLAINED.md](documentation/CRYPTOGRAPHIC_LOGS_EXPLAINED.md) from dialogue format into a low-level → high-level → key-takeaways explanation; updated the root README documentation blurb to match.
 
 ### Added
 - None
@@ -255,14 +294,14 @@ All notable changes to this project will be documented in this file.
 - None
 
 ### Added
-- Added [CRYPTOGRAPHIC_LOGS_EXPLAINED.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/CRYPTOGRAPHIC_LOGS_EXPLAINED.md): IT debate covering hash-chain provenance (birth-certificate analogy), why cryptographic custody is not overengineering, and cryptography vs encryption; linked from root README System Documentation.
+- Added [CRYPTOGRAPHIC_LOGS_EXPLAINED.md](documentation/CRYPTOGRAPHIC_LOGS_EXPLAINED.md): IT debate covering hash-chain provenance (birth-certificate analogy), why cryptographic custody is not overengineering, and cryptography vs encryption; linked from root README System Documentation.
 
 ## 2026-07-23 09:58
 
 **Version:** 1.16.8-Alpha+202607230958
 
 ### Fixed
-- Removed redundant subfolder README files (`working-php/README.md` and `backup-laravel/README.md`) to establish the root [README.md](file:///home/mirkolouis/Documents/DTS%20Prototype/README.md) as the single master documentation file for the repository.
+- Removed redundant subfolder README files (`README.md` and `backup-laravel/README.md`) to establish the root [README.md](README.md) as the single master documentation file for the repository.
 
 ### Added
 - None
@@ -272,21 +311,21 @@ All notable changes to this project will be documented in this file.
 **Version:** 1.16.7-Alpha+202607230945
 
 ### Fixed
-- Expanded and clarified database seeder usage (`seed.js`, `scripts/fast-seed.php`, `scripts/setup-production-db.js`) in [README.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/README.md) with parameter definitions, composer command aliases (`seed:dev`, `seed:fast`, `seed:prod`), and performance characteristics.
+- Expanded and clarified database seeder usage (`seed.js`, `scripts/fast-seed.php`, `scripts/setup-production-db.js`) in [README.md](README.md) with parameter definitions, composer command aliases (`seed:dev`, `seed:fast`, `seed:prod`), and performance characteristics.
 
 ### Added
-- Added a comprehensive Script Directory Guide table in [README.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/README.md) detailing all administrative, telemetry, tuning, security tampering (`corrupt.php`), key generation, and testing utilities in `scripts/`.
-- Included Nginx configuration reverse proxy reference notes matching `nginx.conf`.
+- Added a comprehensive Script Directory Guide table in [README.md](README.md) detailing all administrative, telemetry, tuning, security tampering (`corrupt.php`), key generation, and testing utilities in `scripts/`.
+- Included Nginx configuration reverse proxy reference notes matching `nginx/site.conf`.
 
 ## 2026-07-23 09:27
 
 **Version:** 1.16.6-Alpha+202607230927
 
 ### Fixed
-- Updated [README.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/README.md) to document the transition from host `cron` daemons to the unified container-compatible [console.php](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/console.php) background worker & scheduler.
+- Updated [README.md](README.md) to document the transition from host `cron` daemons to the unified container-compatible [console.php](console.php) background worker & scheduler.
 
 ### Added
-- Added System Documentation & Manuals section in [README.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/README.md) referencing the role-based manuals ([admin_manual.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/user_manuals/admin_manual.md), [officer_manual.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/user_manuals/officer_manual.md), and [staff_manual.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/user_manuals/staff_manual.md)).
+- Added System Documentation & Manuals section in [README.md](README.md) referencing the role-based manuals ([admin_manual.md](documentation/user_manuals/admin_manual.md), [officer_manual.md](documentation/user_manuals/officer_manual.md), and [staff_manual.md](documentation/user_manuals/staff_manual.md)).
 
 ## 2026-07-23 09:23
 
@@ -296,7 +335,7 @@ All notable changes to this project will be documented in this file.
 - N/A
 
 ### Added
-- Added comprehensive role-based Markdown user manuals for System Administrators ([admin_manual.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/user_manuals/admin_manual.md)), Records Officers ([officer_manual.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/user_manuals/officer_manual.md)), and Department Staff ([staff_manual.md](file:///home/mirkolouis/Documents/DTS%20Prototype/working-php/documentation/user_manuals/staff_manual.md)) detailing first-time login, security PIN key generation, RBAC permissions, document workflow execution, and JIT Active Guard tamper recovery.
+- Added comprehensive role-based Markdown user manuals for System Administrators ([admin_manual.md](documentation/user_manuals/admin_manual.md)), Records Officers ([officer_manual.md](documentation/user_manuals/officer_manual.md)), and Department Staff ([staff_manual.md](documentation/user_manuals/staff_manual.md)) detailing first-time login, security PIN key generation, RBAC permissions, document workflow execution, and JIT Active Guard tamper recovery.
 
 ## 2026-07-23 09:04
 
@@ -402,7 +441,7 @@ All notable changes to this project will be documented in this file.
 **Version:** 1.15.5-Alpha+202607221611
 
 ### Fixed
-- Reorganized standalone scratch scripts (`test_cache.php`, `test_spout.php`, `test_spout2.php`, `test_spout.xlsx`, `seed_test.js`) by moving them into `working-php/scripts/` and updating autoload requirements.
+- Reorganized standalone scratch scripts (`test_cache.php`, `test_spout.php`, `test_spout2.php`, `test_spout.xlsx`, `seed_test.js`) by moving them into `scripts/` and updating autoload requirements.
 - Pruned dead commented-out route block (`/tasks` index test alias) in `public/index.php`.
 
 ### Added
@@ -510,7 +549,7 @@ All notable changes to this project will be documented in this file.
 
 ### FIXED
 - Fixed a bug where `DocumentWorkflowService::autoResolveDocument()` crashed with a MySQL 3140 Invalid JSON text error (`The document is empty`) by correctly mapping empty strings to `null` for the `guest_info` and `finalized_route` columns when restoring snapshots from the genesis block.
-- Removed unused and obsolete file `working-php/src/Views/profile/edit.php`.
+- Removed unused and obsolete file `src/Views/profile/edit.php`.
 - Removed obsolete mass-migration scripts (`rewrite_dashboard.php`, `rewrite_intake.php`, `rewrite_integrity.php`, `rewrite_statistics.php`) from the `scripts/` directory as the offset-to-cursor pagination migration is complete.
 
 ## 2026-07-15 15:16
@@ -650,6 +689,10 @@ All notable changes to this project will be documented in this file.
 
 ### CHANGED
 - **Project Relocation:** Moved all existing Laravel project files (excluding the `.git` repository) into the `backup-laravel` directory to serve as a functional reference application.
+
+---
+
+> **Laravel era (v0.1.0 – v1.11.0).** Everything below describes the retired Laravel 12 version (Artisan, Vite, Blade, local-ssl-proxy, return requests, TF-IDF routing). It is kept as history; none of it applies to the current PHP app.
 
 ## [1.11.0-Alpha+202607011146] - 2026-07-01
 

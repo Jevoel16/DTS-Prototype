@@ -1,5 +1,8 @@
 # DTS System Architecture & Core Logic
 
+> [!WARNING]
+> **Legacy (Laravel) documentation — not applicable to the current PHP app.** Kept for history and the research paper. Current docs: [documentation/](../).
+
 ## Summary
 A comprehensive technical deep-dive into the Document Tracking System (DTS) designed for the **DepEd Division of Iligan City**. This document details the underlying technologies, the end-to-end document lifecycle, the sophisticated cryptographic "Trust Builder" (hashing and Ed25519 signatures), and the AI-driven route prediction engine. It is intended for developers, system architects, and technical stakeholders.
 

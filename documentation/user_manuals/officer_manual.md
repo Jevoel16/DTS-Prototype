@@ -6,101 +6,104 @@
 
 ## 1. Overview & Role Summary
 
-As a **Records Officer** (`officer`), you serve as the central gateway for all official documents entering and exiting the DepEd Division of Iligan City. Your responsibilities include intaking public submissions, validating document requirements, defining and finalizing departmental routing paths, scanning incoming physical paperwork, declining incomplete submissions, and conducting final document release to owners.
+As a **Records Officer** (`officer`), you are the gateway for every document entering and leaving the DepEd Division of Iligan City. You take in public submissions, confirm the department route, decline incomplete submissions, receive folders back from departments, and release finished documents to their owners.
 
 ---
 
-## 2. Role-Based Access Control (RBAC) Permissions
+## 2. What You Can Access
 
-| Feature / Resource | Access Level | Description |
+| Page | URL | What it is for |
 | :--- | :--- | :--- |
-| **Intake Portal** (`/intake`) | Primary Landing | Process guest/walk-in submissions, configure routing steps, finalize routes. |
-| **Releasing Portal** (`/releasing`) | Full Access | Review fully processed documents, capture recipient details, mark as released. |
-| **Global QR Scanner** (`/documents/scan`) | Full Access | Scan QR codes on physical documents to log intake/receipt actions. |
-| **Document Management** (`/documents/{id}/manage`) | Full Access | Edit finalized routing paths and document metadata prior to completion. |
-| **Document Finalize & Decline** | Full Access | Complete document lifecycles or decline invalid submissions with remarks. |
-| **Division Statistics** (`/statistics`) | Full Access | View processing TAT charts and generate background PDF/Excel exports. |
-| **Global Document Visibility** | Full Access | View details and audit hash chains for any document in the system. |
-| **Admin Panel & User Setup** | No Access | Restricted to System Administrators (`admin` role). |
+| **Document Intake** (home) | `/intake` | Find a submission by tracking code or QR scan; list of documents you handled in the last 4 weeks (filter by date, status, purpose, submitter, search). |
+| **Manage Document Route** | `/documents/{id}/manage` | Review a pending submission, adjust its route, **Finalize Route** or **Decline Document**. |
+| **Tasks** | `/tasks` | Documents currently at the Records Unit's own processing step (officers can process these like staff). |
+| **Completed** | `/tasks/completed` | Documents you finished processing. |
+| **Releasing** | `/releasing` | Documents marked `ready_for_release`; release them to the owner. |
+| **Statistics** | `/statistics` | Department charts, released-documents table, **Generate Report** (XLSX) and **Past Reports**. |
+| **Document details / Hash chain** | `/documents/{tracking_code}`, `/documents/{tracking_code}/hash-chain` | Full history and the signed audit trail of any document. |
+| **Admin pages, user management** | — | Not available (admins only). |
 
 ---
 
-## 3. First-Time Login & Security Key Setup
+## 3. First Login: Set Up Your Signing PIN
 
-All state-mutating actions (Intake, Scan, Finalize, Decline, Release) require an **Ed25519 Digital Signature** to guarantee non-repudiation.
+Every action that changes a document (finalize, decline, receive, complete, release) is signed with your personal **Ed25519 digital signature**.
 
-### Step-by-Step Initialization:
+1. Sign in at `/login` with your username (e.g. `records.unit`) and password.
+2. On your first login a window titled **Action Required: Setup Your Digital Signature** appears over the page. You cannot perform any action until you finish it.
+3. Enter a **Security PIN of at least 6 characters** and confirm it.
+4. Click **Generate & Secure Key**. The system creates your key pair and stores your private key encrypted with your PIN.
 
-1. Navigate to `/login` and sign in with your officer credentials.
-2. The system automatically redirects first-time users to `/security-key`.
-3. Enter your secret **6-Digit Security PIN**.
-4. Click **Set Security Key**. The system generates your cryptographic Ed25519 keypair. Your private key is encrypted with your PIN before being stored safely in the database.
+> [!IMPORTANT]
+> Your PIN cannot be recovered. If you forget it, ask an administrator to **Reset** your digital signature in User Management, then set a new PIN at your next login.
 
-> [!WARNING]
-> Keep your 6-digit PIN secret. You will be prompted to enter this PIN every time you intake, scan, decline, or release a document.
+**PIN prompts:** the first signed action in a browser tab asks for your PIN. The tab then remembers it (in `sessionStorage`) until you close the tab, so later actions in the same tab do not ask again. Close the tab when you leave a shared computer.
 
 ---
 
-## 4. Operational Workflows & Step-by-Step Guide
+## 4. Workflows
 
-### 4.1 Intaking & Finalizing New Submissions (`/intake`)
+### 4.1 Intake & Route Finalization
 
 ```
-[Public/Walk-in Document] ──> [/intake Portal] ──> [Configure Route] ──> [Enter PIN & Sign] ──> [Print QR Tracking Form]
+[Guest submits online] ──> status: pending ──> [Officer: Finalize Route + PIN] ──> status: in_transit ──> first department
 ```
 
-1. **Access Intake Portal:** Go to `/intake`. Unprocessed submissions submitted by guests or walk-ins appear in the queue.
-2. **Review Document Details:** Click **Manage Route** on a pending document.
-3. **Verify Purpose & Requirements:** Inspect submitter details, purpose, and attached compliance items.
-4. **Configure Department Route:**
-   - Review the default route suggested by the system based on document keywords.
-   - Adjust department order (e.g., *Records -> Administrative -> Budget -> Accounting -> ODS*).
-5. **Finalize & Sign:**
-   - Click **Finalize & Accept Document**.
-   - Prompt Modal: Enter your **6-Digit PIN**.
-   - The system calculates the initial SHA-256 state hash, generates your Ed25519 signature, and logs `Accepted and Document Routing finalized` in `document_logs`.
-6. **Print Tracking Form:** Click **Print Tracking Form** to generate a printable PDF containing the tracking code and scannable QR code (`/documents/{tracking_code}/print-tracking-form`). Attach this form to the physical paper folder.
+1. A guest submits a document on the public page and receives a tracking code (`DEPED-` followed by 10 characters) plus a **printable tracking form** with a QR code. (Anyone can reopen the form at `/documents/{tracking_code}/print-tracking-form`.)
+2. On **Document Intake** (`/intake`), type the code in **Add Document by Tracking Code** and click **Find**, or click **Scan QR Code** and scan the form. This opens **Manage Document Route**.
+3. Check the submitter, purpose and requirements.
+4. Review the route. It is pre-filled from the purpose's **suggested route**, which is simply the last route an officer finalized for that purpose. Guests who type their own purpose are filed under **Others**, and you choose the departments. Drag departments to reorder, add or remove them.
+5. Click **Finalize Route** and enter your PIN. The document becomes `in_transit` to the first department, and the log records **"Accepted and Document Routing finalized"**.
 
-### 4.2 Scanning & Receiving Physical Documents (`/documents/scan`)
+> [!NOTE]
+> Pending submissions that are not finalized within **3 days** are declined automatically by the system ("System Auto-Cleanup: Pending document expired…"), with a system-sealed log entry.
 
-1. Open the QR Scanner modal from the top navigation bar or navigate to `/intake`.
-2. Point the camera scanner at the document's printed QR code (or enter the tracking code manually).
-3. Confirm document details in the pop-up modal.
-4. Enter your **Security PIN** and click **Receive Document**.
-5. The system locks the database row (`SELECT ... FOR UPDATE`), records a `Received at Records` log entry with your digital signature, and updates the document status.
+### 4.2 Declining a Submission
 
-### 4.3 Declining Incomplete Submissions
+1. On **Manage Document Route**, click **Decline Document**.
+2. Type the reason (e.g. *Missing principal's endorsement*), enter your PIN and confirm.
+3. The status becomes `declined` and the log records **"Document Declined"** with your reason.
 
-1. On the document management page (`/documents/{id}/manage`), click **Decline Document**.
-2. Select a decline reason or type explicit notes in the remarks box (e.g., *Missing Principal endorsement signature*).
-3. Enter your **Security PIN** and confirm.
-4. The system updates status to `declined` and logs the signed decline record.
+### 4.3 Receiving Folders (QR Scan)
+
+Use **Scan QR Code** (camera or typed code) whenever a folder arrives at the Records Unit:
+
+- If the Records Unit is a step in the route, the document is **Received** and appears in **Tasks**; complete it like any department (see the [Staff Manual](staff_manual.md)).
+- If all department steps are done, the document becomes `ready_for_release` and the log records **"Ready for Releasing"**.
+
+The scanner tells you why a document cannot be received (e.g. still pending intake, being processed by another department, already in the release list, already released).
 
 ### 4.4 Releasing Completed Documents (`/releasing`)
 
-When a document finishes all departmental routing steps, its status advances to `ready_for_release` and it appears in the Releasing Portal.
+1. Open **Releasing**. It lists documents with status `ready_for_release`.
+2. Hand the folder to the owner, click **Release** on that row and enter your PIN.
+3. The status becomes `completed` and the log records **"Document Released"** ("The document has been released to the client."). The system does not record the recipient's name; the signed entry ties the release to you.
 
-1. Navigate to **Releasing** (`/releasing`).
-2. Locate the physical document folder returned by the final department.
-3. Click **Release Document**.
-4. In the releasing modal:
-   - Record the name and contact of the person receiving the physical document.
-   - Add optional release notes.
-   - Enter your **Security PIN**.
-5. Click **Confirm Release**. The document status updates to `completed` / `released`, and a final signed log entry is generated.
+### 4.5 Reports (`/statistics`)
 
-### 4.5 Exporting Statistical Reports (`/statistics`)
-
-1. Navigate to `/statistics`.
-2. Select desired date ranges and report formats (PDF or Excel).
-3. Click **Generate Report**. The system dispatches an asynchronous background job ([GenerateReportJob](file:///home/mirkolouis/Documents/DTS%20Prototype/src/Jobs/GenerateReportJob.php)).
-4. Monitor export progress in the floating report progress modal and download the completed file.
+1. Open **Statistics** and filter the released-documents table (date, purpose, submitter, search) if needed.
+2. Click **Generate Report**. The queue worker builds it in the background; progress shows in a modal and a notification appears when it is ready.
+3. Download it from the modal or later from **Past Reports**. Reports are **Excel (XLSX)** files named `released-documents-<timestamp>-<count>docs[-filters].xlsx`. They contain only documents released by your department before you clicked Generate.
 
 ---
 
-## 5. Troubleshooting & FAQs
+## 5. Document Statuses
 
-- **Q: The QR camera scanner is not opening.**  
-  *A:* Ensure your web browser has camera permissions granted for the DTS domain. Alternatively, type the tracking code into the manual input box.
-- **Q: An error says "Action Denied: Document failed integrity check".**  
-  *A:* The document's SHA-256 state hash does not match the ledger. The document has been auto-frozen by the Active Guard. Notify a System Administrator to run Auto-Resolve.
+| Status | Meaning |
+| :--- | :--- |
+| `pending` | Submitted by a guest, waiting for intake. |
+| `in_transit` | Route finalized or a step completed; travelling to the next department. |
+| `processing` | Received by a department and being worked on. |
+| `ready_for_release` | All steps done; back at the Records Unit. |
+| `completed` | Released to the owner. |
+| `declined` | Declined by an officer, or expired after 3 days pending. |
+| `frozen` | Locked by an administrator or the integrity guard pending investigation. |
+
+---
+
+## 6. Troubleshooting & FAQs
+
+- **The QR camera does not open.** Allow camera access for the DTS site in your browser. Browsers only allow the camera on HTTPS or `localhost`, so use the `https://` address. You can always type the tracking code instead.
+- **"Action Denied: … integrity" / the document is frozen.** The document's data no longer matches its signed history. Ask an administrator to investigate and **Auto-resolve** it.
+- **"This document was just modified by another user. Please refresh."** Someone acted on the same document a moment before you. Refresh and check its new status.
+- **A report never finishes.** The queue worker may not be running. Ask the administrator; it starts with `composer run dev` / `composer run prod`.

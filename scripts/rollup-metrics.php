@@ -28,8 +28,11 @@ foreach ($rollups as $row) {
         // 1. Delete the raw 5-minute data for this specific hour
         $db->query(
             "DELETE FROM database_metrics
-             WHERE DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') = :hour",
-            ['hour' => $row['hour_group']]
+             WHERE created_at >= :hour_start AND created_at < :hour_end",
+            [
+                'hour_start' => $row['hour_group'],
+                'hour_end' => date('Y-m-d H:i:s', strtotime($row['hour_group'] . ' +1 hour')),
+            ]
         );
 
         // 2. Insert the single aggregated hourly row

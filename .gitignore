@@ -1,86 +1,56 @@
-# Root & General
-.gitignore
-.cursor/
-docs/
-.superpowers/
-laravel_files.txt
-php_files.txt
+# --- Secrets & local config ---
+.env
+.env.backup
+.env.production
+*.key
+*.crt
+/auth.json
+
+# --- Dependencies (restored by composer install / npm ci) ---
+/vendor/
+node_modules/
+
+# --- Runtime output ---
+/cache/
+/storage/logs/*
+/storage/app/
+/storage/nginx/
+/storage/ssl/
+*.log
+/temp
 *.xlsx
 
-# Global Ignores
-*.log
+# --- Large legacy data: kept on disk, not in git (see README "Legacy / simulated data") ---
+/from_dts/dts_docroutes (1).csv
+/from_dts/dts_docroutes.sql
+
+# --- Editors & OS ---
 .DS_Store
 Thumbs.db
 *~
 *.swp
 *.bak
 *.tmp
+.cursor/
 .fleet/
 .idea/
 .vscode/
 .zed/
 .nova/
 .history/
-node_modules/
-npm-debug.log
-yarn-error.log
-package-lock.json
-.babelrc
-.eslintrc
-.eslintrc.js
-.eslintrc.json
-.env
-.env.backup
-.env.production
-*.key
-*.crt
+.superpowers/
 .phpactor.json
-.phpunit.result.cache
-.phpunit.cache/
-phpstan-baseline.neon
-.gitlab-ci.yml
-.travis.yml
-app-debug.apk
-app-release.apk
-Homestead.json
-Homestead.yaml
-homestead.box
-homestead.vagrant
 
-# --- App ---
-/auth.json
-/public/build/
-/public/hot/
-/public/storage/
-/storage/*.key
-/vendor/
-/lang/
-/storage/pail/
-/dumps/
-/dist/
-/sources/
-/old/
+# --- Personal notes ---
 /commit.md
 /GEMINI.md
 /FINDINGS.md
-/cache/
+docs/
 
-/storage/app/reports/*.csv
-/storage/reports/*.xlsx
-/storage/cache/*.sqlite*
-/storage/app/backups/*
-
-/database/database.sqlite
-/database/database.sqlite-journal
-/storage/database.sqlite
-
-/database/database_backups/*
-!/database/database_backups/.gitkeep
-
+# --- Thesis paper: private references & templates ---
 /paper/references/*
 /paper/TEMPLATES/*
 /paper/Templates (converted)/
 /paper/\[DRAFT] Thesis nilang Jove.md
 /paper/PITCH_SCRIPT.md
 /paper/ITE193/*
-/temp

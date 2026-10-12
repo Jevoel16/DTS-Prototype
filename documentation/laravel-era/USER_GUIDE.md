@@ -1,5 +1,8 @@
 # DTS User Guide & Role-Based Workflows
 
+> [!WARNING]
+> **Legacy (Laravel) documentation — not applicable to the current PHP app.** Kept for history and the research paper. Current docs: [documentation/](../).
+
 ## Summary
 A comprehensive manual for all users of the Document Tracking System (DTS). This document outlines the distinct workflows for **Administrators**, **Records Officers**, and **Department Staff**. It highlights the transition from traditional manual tracking to the new, digitally-signed workflow, ensuring all users can navigate their respective dashboards and perform their duties with confidence.
 

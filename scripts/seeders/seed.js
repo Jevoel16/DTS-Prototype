@@ -9,7 +9,8 @@ const execPromise = util.promisify(exec);
 
 // --- SETTINGS ---
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-const API_BASE = 'https://localhost:8000';
+// nginx serves https://localhost:8000; the php -S fallback is plain http (set APP_URL in .env)
+const API_BASE = process.env.APP_URL || 'https://localhost:8000';
 const DEFAULT_PASSWORD = 'password';
 
 // Parse command line arguments
@@ -768,7 +769,6 @@ async function seed() {
         await connection.query('TRUNCATE TABLE database_metrics');
         await connection.query('TRUNCATE TABLE integrity_checks');
         await connection.query('TRUNCATE TABLE cache');
-        await connection.query('TRUNCATE TABLE cache_locks');
         await connection.query('TRUNCATE TABLE user_public_key_histories');
         await connection.query('SET FOREIGN_KEY_CHECKS = 1');
 
@@ -863,7 +863,7 @@ async function seed() {
         await flushMetrics(connection);
 
         console.log('📈 Backfilling daily departmental metrics...');
-        execSync(`php "${path.join(__dirname, '../backfill-metrics.php')}"`, { stdio: 'inherit' });
+        execSync(`php "${path.join(__dirname, '../backfill-metrics.php')}" --full`, { stdio: 'inherit' });
 
         console.log('🔒 Resetting all digital signatures for first-time login...');
         await connection.query("UPDATE user_public_key_histories SET activated_at = '2020-01-01 00:00:00', deactivated_at = NOW(), updated_at = NOW() WHERE deactivated_at IS NULL");

@@ -116,7 +116,8 @@
         $trackingUrl = $protocol . $host . '/track?codes=' . urlencode($document['tracking_code']);
         
         // Base64 encode the logo for reliable DomPDF rendering
-        $logoPath = BASE_PATH . '/public/images/DepEd Seal.png';
+        // 480px copy of "DepEd Seal.png": shown at 120px, so the full 1280px original only slows DomPDF
+        $logoPath = BASE_PATH . '/public/images/deped-seal-print.png';
         $logoData = '';
         if (file_exists($logoPath)) {
             $logoData = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));

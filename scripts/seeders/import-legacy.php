@@ -120,7 +120,8 @@ class WeightedNameGenerator {
 
 echo "🚀 Starting Legacy Data Import Seeder (Dynamic Routes)...\n";
 
-$csvPath = BASE_PATH . '/from_dts/week_2026_07_27_to_07_30.csv';
+// Usage: composer run seed:legacy [-- path/to/week.csv]  (default: the tracked July 27-30 week)
+$csvPath = $argv[1] ?? BASE_PATH . '/from_dts/week_2026_07_27_to_07_30.csv';
 if (!file_exists($csvPath)) {
     die("CSV not found at $csvPath\n");
 }
@@ -566,4 +567,7 @@ if (!empty($docsToInsert)) {
 
 $conn->commit();
 $conn->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+// Rebuild dashboard metrics for the imported history
+passthru('php ' . escapeshellarg(BASE_PATH . '/scripts/backfill-metrics.php') . ' --full');
 echo "🎉 Done! Seeded legacy data successfully.\n";

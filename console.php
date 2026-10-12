@@ -2,13 +2,13 @@
 
 /**
  * Console Worker for processing background jobs.
- * This simulates Laravel's `php artisan queue:work`.
+ * Long-running queue worker + scheduler (started by `composer run dev|prod|worker`).
  * Run this script via CLI: `php console.php`
  */
 
 require __DIR__ . '/vendor/autoload.php';
 
-// Match Laravel's default timezone so background hash generation aligns properly
+// Must match public/index.php so background hash generation aligns properly
 date_default_timezone_set('Asia/Manila');
 
 use App\Core\Database;
@@ -22,7 +22,7 @@ $db = Database::getInstance();
 $stopWorker = false;
 
 // Memory leak prevention limits
-$maxMemory = 8 * 1024 * 1024 * 1024; // 8 GB limit before restarting
+$maxMemory = 256 * 1024 * 1024; // 256 MB: the loop itself needs a few MB; jobs run in child processes
 $maxJobs = 100; // Restart after 100 jobs to clear any accumulated state
 $jobsProcessed = 0;
 
@@ -88,6 +88,16 @@ function runScheduledTasks(int &$lastSampleTime, int &$lastBackfillTime, int &$l
             }
         }
         echo "⏰ [Worker Scheduler] Response cache GC: purged {$purged} stale file(s).\n";
+
+        // Expired rows in the database cache table are otherwise only removed when read again
+        try {
+            $deleted = \App\Core\Database::getInstance()
+                ->query("DELETE FROM cache WHERE expiration < UNIX_TIMESTAMP()")
+                ->rowCount();
+            echo "⏰ [Worker Scheduler] Database cache GC: removed {$deleted} expired row(s).\n";
+        } catch (\Throwable $e) {
+            echo "⏰ [Worker Scheduler] Database cache GC failed: " . $e->getMessage() . "\n";
+        }
 
         // Rotate navigation.log when it exceeds 50 MB to prevent unbounded growth
         $navLog = BASE_PATH . '/storage/logs/navigation.log';
@@ -178,8 +188,9 @@ while (!$stopWorker) {
         continue;
     }
 
-    // Look for a pending job
-    $sql = "SELECT * FROM jobs WHERE reserved_at IS NULL AND available_at <= UNIX_TIMESTAMP() ORDER BY id ASC LIMIT 1";
+    // Look for a pending job (served by the jobs_pending_index on reserved_at, available_at)
+    $db->ensureConnected();
+    $sql = "SELECT id FROM jobs WHERE reserved_at IS NULL AND available_at <= UNIX_TIMESTAMP() ORDER BY id ASC LIMIT 1";
     $stmt = $db->query($sql);
     $job = $stmt->fetch();
 
@@ -188,12 +199,10 @@ while (!$stopWorker) {
         
         // Claim the job atomically. Using UPDATE ensures that if multiple worker processes 
         // are running concurrently, only one will successfully claim this specific row.
-        $db->query("UPDATE jobs SET reserved_at = UNIX_TIMESTAMP(), attempts = attempts + 1 WHERE id = :id AND reserved_at IS NULL", ['id' => $jobId]);
-        
-        // Ensure we actually reserved it (in case of multiple workers)
-        $check = $db->query("SELECT * FROM jobs WHERE id = :id AND reserved_at IS NOT NULL", ['id' => $jobId])->fetch();
-        
-        if ($check) {
+        $claim = $db->query("UPDATE jobs SET reserved_at = UNIX_TIMESTAMP(), attempts = attempts + 1 WHERE id = :id AND reserved_at IS NULL", ['id' => $jobId]);
+
+        // rowCount() is 1 only for the worker whose UPDATE actually reserved the row
+        if ($claim->rowCount() === 1) {
             echo "Dispatching Job ID: {$jobId}\n";
             
             // Dispatch in background

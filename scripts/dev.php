@@ -5,7 +5,7 @@ require_once __DIR__ . '/server-lib.php';
 // Populated once the Linux branch detects the PHP version
 $GLOBALS['fpmService'] = 'php-fpm';
 
-// PCNTL is unavailable on Windows; there Ctrl+C simply ends the built-in server
+// PCNTL is Linux-only; Windows Ctrl+C handling lives in server-lib.php
 if (extension_loaded('pcntl')) {
     // Enable asynchronous signal handling
     pcntl_async_signals(true);
@@ -24,8 +24,7 @@ if (extension_loaded('pcntl')) {
 }
 
 try {
-    $os   = PHP_OS_FAMILY;
-    $port = 8000;
+    $port = DTS_PORT;
 
     echo "🧹 Clearing application cache...\n";
     $cacheDir = __DIR__ . '/../cache';
@@ -39,9 +38,13 @@ try {
         echo "✅ Local cache cleared.\n\n";
     }
 
-    if ($os === 'Windows') {
-        echo "🚀 [Windows Detected] Starting PHP Built-in Development Server on port $port...\n";
-        executeCommand("php -S 0.0.0.0:$port -t public");
+    echo "💡 Tailwind is not rebuilt here: run `npm run dev` in another terminal while editing views.\n\n";
+
+    if (isWindows()) {
+        echo "🚀 [Windows Detected] Starting NGINX + php-cgi...\n";
+        if (!runWindowsNginx(true, 'Development')) {
+            runWindowsBuiltinServer(true);
+        }
     } else {
         echo "🚀 [Linux Detected] Starting NGINX & PHP-FPM on demand...\n";
 
@@ -61,24 +64,13 @@ try {
         ensureSslCert($lanIp);
 
         // Install the project NGINX config (substitutes placeholders)
-        installNginxConfig(realpath(__DIR__ . '/..'), $phpVersion, $lanIp);
+        installNginxConfig(projectRoot(), $phpVersion, $lanIp);
 
         echo "▶️  Ensuring NGINX is running...\n";
         // Using restart so NGINX picks up the new PHP-FPM socket and updated cert
         executeCommand("sudo service nginx restart");
 
-        echo "⚙️  Starting Async Queue Worker (console.php)...\n";
-        $consolePath = realpath(__DIR__ . '/../console.php');
-
-        // Find and kill any existing console.php to avoid duplicates
-        passthru("pkill -f 'php $consolePath' > /dev/null 2>&1");
-
-        // Run console.php in the background and redirect output to a log file
-        $logFile = realpath(__DIR__ . '/../storage/logs') . '/worker.log';
-        if (!is_dir(dirname($logFile))) {
-            mkdir(dirname($logFile), 0777, true);
-        }
-        exec("nohup php " . escapeshellarg($consolePath) . " > " . escapeshellarg($logFile) . " 2>&1 &");
+        startQueueWorker();
 
         echo "\n✅ Development Server is now powered by NGINX & PHP-FPM!\n";
         echo "   Local:   https://localhost:$port\n";

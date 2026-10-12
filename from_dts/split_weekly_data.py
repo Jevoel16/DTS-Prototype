@@ -1,9 +1,12 @@
 import csv
+import os
 from datetime import datetime
 
-input_file = '/home/mirkolouis/Documents/DTS Prototype/from_dts/dts_docroutes (1).csv'
-output_file_1 = '/home/mirkolouis/Documents/DTS Prototype/from_dts/week_2026_07_20_to_07_23.csv'
-output_file_2 = '/home/mirkolouis/Documents/DTS Prototype/from_dts/week_2026_07_27_to_07_30.csv'
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+input_file = os.path.join(HERE, 'dts_docroutes (1).csv')
+output_file_1 = os.path.join(HERE, 'week_2026_07_20_to_07_23.csv')
+output_file_2 = os.path.join(HERE, 'week_2026_07_27_to_07_30.csv')
 
 start_1 = datetime(2026, 7, 20)
 end_1 = datetime(2026, 7, 23, 23, 59, 59)

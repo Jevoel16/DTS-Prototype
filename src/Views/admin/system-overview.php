@@ -346,7 +346,6 @@ require BASE_PATH . '/src/Views/components/modal.php';
 
 ?>
 
-<script src="/js/chart.min.js"></script>
 <script src="/js/system-health.js"></script>
 <script>
 // Named so both DOMContentLoaded and dts:page-loaded (PJAX swap) trigger re-binding

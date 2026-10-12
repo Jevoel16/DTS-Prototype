@@ -1,8 +1,7 @@
 {
-  "name": "working-php",
+  "name": "dts-prototype",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Tailwind build + Node seeders for the DTS Prototype (PHP)",
   "scripts": {
     "build": "tailwindcss -i ./input.css -o ./public/css/tailwind.css --minify",
     "dev": "tailwindcss -i ./input.css -o ./public/css/tailwind.css --watch"
@@ -12,10 +11,9 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "dotenv": "^17.4.2",
+    "mysql2": "^3.22.5",
     "tailwindcss": "^3.4.19"
   },
-  "dependencies": {
-    "dotenv": "^17.4.2",
-    "mysql2": "^3.22.5"
-  }
+  "private": true
 }

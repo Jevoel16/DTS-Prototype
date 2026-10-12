@@ -3,11 +3,13 @@
     "description": "Document Tracking System (Pure PHP)",
     "type": "project",
     "require": {
-        "php": ">=8.0",
+        "php": ">=8.3",
+        "ext-pdo_mysql": "*",
+        "ext-sodium": "*",
+        "ext-mbstring": "*",
+        "ext-gd": "*",
         "chillerlan/php-qrcode": "^6.0",
         "dompdf/dompdf": "^3.0",
-        "phpmailer/phpmailer": "^7.1",
-        "symfony/cache": "^7.4",
         "openspout/openspout": "^5.3"
     },
     "autoload": {
@@ -25,10 +27,13 @@
         "dev": "php scripts/dev.php",
         "prod": "php scripts/prod.php",
         "worker": "php console.php",
-        "proxy": "cloudflared tunnel --url http://localhost:8000",
+        "proxy": "cloudflared tunnel --url https://localhost:8000 --no-tls-verify",
+        "css": "npm run build",
+        "migrate": "php scripts/migrate.php",
         "corrupt": "php scripts/corrupt.php",
         "seed:dev": "node scripts/seeders/seed.js",
         "seed:fast": "php scripts/seeders/fast-seed.php",
-        "seed:prod": "node scripts/seeders/setup-production-db.js"
+        "seed:prod": "node scripts/seeders/setup-production-db.js",
+        "seed:legacy": "php scripts/seeders/import-legacy.php"
     }
 }

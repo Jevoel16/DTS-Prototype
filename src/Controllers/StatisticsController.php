@@ -22,7 +22,7 @@ class StatisticsController
 
             $viewData['releasedDocuments'] = $documents;
             $viewData['paginator'] = $paginator;
-            $viewData['purposes'] = $this->getAllPurposes();
+            $viewData['purposes'] = $queryService->getAllPurposes();
             $viewData['activeFilters'] = ['date', 'purpose', 'submitter', 'search'];
             
             $pastReports = $db->query("SELECT * FROM report_jobs WHERE user_id = :uid AND status = 'completed' ORDER BY created_at DESC", ['uid' => $_SESSION['user_id']])->fetchAll();
@@ -119,41 +119,15 @@ class StatisticsController
         $userDept = $db->query("SELECT department_id FROM users WHERE id = :uid", ['uid' => $job['user_id']])->fetch();
         $departmentId = $userDept['department_id'] ?? 0;
 
-        // Bounded Query: upper-bounded by job creation timestamp so future released documents are excluded
-        $where = ["d.status = 'completed'", "d.released_by_user_id > 0", "d.updated_at <= :job_created_at"];
-        $params = [':dept_id' => $departmentId, ':job_created_at' => $jobCreatedAt];
-        
-        $join = "INNER JOIN users u ON d.released_by_user_id = u.id AND u.department_id = :dept_id
-                 LEFT JOIN purposes p ON d.purpose_id = p.id";
-
-        if (!empty($filters['date'])) {
-            $where[] = "DATE(d.released_at) = :date";
-            $params[':date'] = $filters['date'];
-        }
-        if (!empty($filters['search'])) {
-            $where[] = "(d.tracking_code LIKE :search OR json_unquote(json_extract(d.guest_info, '$.name')) LIKE :search2)";
-            $params[':search'] = '%' . $filters['search'] . '%';
-            $params[':search2'] = '%' . $filters['search'] . '%';
-        }
-        if (!empty($filters['purpose']) && $filters['purpose'] !== 'all') {
-            $where[] = "p.name = :purpose";
-            $params[':purpose'] = $filters['purpose'];
-        }
-        if (!empty($filters['submitter'])) {
-            $where[] = "LOWER(json_unquote(json_extract(d.guest_info, '$.name'))) LIKE :submitter";
-            $params[':submitter'] = '%' . strtolower($filters['submitter']) . '%';
-        }
-
-        $whereSql = implode(' AND ', $where);
+        $query = \App\Services\ReleasedReportQuery::build($departmentId, $jobCreatedAt, $filters);
         $sql = "
             SELECT d.tracking_code, d.title, p.name as purpose_name, d.district, d.guest_info, d.updated_at
-            FROM documents d
-            {$join}
-            WHERE {$whereSql}
+            FROM {$query['from']}
+            WHERE {$query['where']}
             ORDER BY d.released_at DESC
         ";
 
-        $stmt = $db->query($sql, $params);
+        $stmt = $db->query($sql, $query['params']);
 
         // Build descriptive filename
         $timestamp = date('Ymd_His', strtotime($jobCreatedAt));
@@ -221,15 +195,6 @@ class StatisticsController
         exit;
     }
 
-    public function getReportCount()
-    {
-        $db = Database::getInstance();
-        $count = $db->query("SELECT COUNT(*) as count FROM documents WHERE status = 'completed'")->fetch()['count'];
-        header('Content-Type: application/json');
-        echo json_encode(['count' => $count]);
-        exit;
-    }
-
     public function getThroughputData()
     {
         $period = $_GET['period'] ?? 'daily';
@@ -286,12 +251,5 @@ class StatisticsController
         header('Content-Type: application/json');
         echo json_encode($pastReports);
         exit;
-    }
-
-    private function getAllPurposes()
-    {
-        $db = Database::getInstance();
-        $stmt = $db->query("SELECT id, name FROM purposes ORDER BY name ASC");
-        return $stmt->fetchAll();
     }
 }

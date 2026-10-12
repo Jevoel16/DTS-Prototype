@@ -1,5 +1,8 @@
 # Hash Chain Functionality (The Trust Builder)
 
+> [!WARNING]
+> **Legacy (Laravel) documentation — not applicable to the current PHP app.** Kept for history and the research paper. Current docs: [documentation/](../).
+
 This document visualizes the cryptographic logic used by the **Document Tracking System (DTS)** to ensure document immutability, non-repudiation, and chronological integrity.
 
 ## 📊 Logic Flow Diagram
@@ -64,4 +67,4 @@ graph TD
 4.  **Micro-Sharding (The Scale):** Unlike a global blockchain, the DTS utilizes independent hash chains for every document. This ensures that an integrity failure in one record does not halt the entire system and maintains $O(\log n)$ performance during verification.
 
 ---
-*Refer to `app/Models/DocumentLog.php` for the implementation of this logic.*
+*Refer to `src/Core/IntegrityManager.php` (PHP version) for the implementation of this logic.*

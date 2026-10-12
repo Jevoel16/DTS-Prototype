@@ -200,7 +200,7 @@ class DocumentQueryService
 
     public function getPaginatedOfficerIntake(int $officerId, array $requestParams, int $perPage = 15): array
     {
-        $filters = $this->buildFilterQuery(['date', 'status', 'purpose', 'submitter', 'search'], 'max_logs.handled_at', $requestParams);
+        $filters = $this->buildFilterQuery(['date', 'status', 'purpose', 'submitter', 'search'], 'max_logs.created_at', $requestParams);
         $params = array_merge([':officer_id' => $officerId], $filters['params']);
         
         $cursor = $requestParams['cursor'] ?? null;
@@ -210,7 +210,9 @@ class DocumentQueryService
             $countSql = "WITH MaxLogs AS (
                              SELECT document_id, MAX(created_at) as created_at
                              FROM document_logs
-                             WHERE user_id = :officer_id AND action_category = 1
+                             WHERE user_id = :officer_id
+                               AND action_category = 1
+                               AND created_at >= DATE_SUB(NOW(), INTERVAL 4 WEEK)
                              GROUP BY document_id
                          )
                          SELECT COUNT(d.id) as total 
@@ -237,7 +239,9 @@ class DocumentQueryService
         $sql = "WITH MaxLogs AS (
                     SELECT document_id, MAX(created_at) as created_at
                     FROM document_logs
-                    WHERE user_id = :officer_id AND action_category = 1
+                    WHERE user_id = :officer_id
+                               AND action_category = 1
+                               AND created_at >= DATE_SUB(NOW(), INTERVAL 4 WEEK)
                     GROUP BY document_id
                 )
                 SELECT d.id, d.tracking_code, d.title, d.status, d.created_at, d.guest_info, p.name as purpose_name, max_logs.created_at as handled_at 
@@ -311,7 +315,7 @@ class DocumentQueryService
 
     public function getPaginatedOfficerCompletedTasks(int $officerId, array $requestParams, int $perPage = 15): array
     {
-        $filters = $this->buildFilterQuery(['date', 'status', 'purpose', 'submitter', 'search'], 'max_logs.handled_at', $requestParams);
+        $filters = $this->buildFilterQuery(['date', 'status', 'purpose', 'submitter', 'search'], 'max_logs.created_at', $requestParams);
         $params = array_merge([':officer_id' => $officerId], $filters['params']);
         
         $cursor = $requestParams['cursor'] ?? null;

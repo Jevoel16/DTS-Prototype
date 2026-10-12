@@ -51,14 +51,6 @@ if (isset($_SESSION['user_id'])) {
             }
         })();
     </script>
-    <script src="/js/vendor/libsodium-wrappers.js"></script>
-    <script src="/js/vendor/libsodium.js"></script>
-    <script>
-        window.UserConfig = {
-            id: <?= json_encode($_SESSION['user_id'] ?? null) ?>,
-            encryptedPrivKey: <?= json_encode($_SESSION['private_key'] ?? '') ?>
-        };
-    </script>
     <style>
         @keyframes slideInRight {
             from { transform: translateX(100%); opacity: 0; }
@@ -69,7 +61,7 @@ if (isset($_SESSION['user_id'])) {
         }
     </style>
     
-    <!-- Local Chart.js for Admin dashboard -->
+    <!-- Chart.js is loaded once here (not per page) so PJAX page swaps reuse it -->
     <script src="/js/chart.min.js"></script>
 </head>
 <body class="font-sans antialiased bg-gray-100 dark:bg-darkBg text-gray-900 dark:text-gray-100">

@@ -1,5 +1,8 @@
 # DTS Quantum Safety & Post-Quantum Strategy
 
+> [!WARNING]
+> **Legacy (Laravel) documentation — not applicable to the current PHP app.** Kept for history and the research paper. Current docs: [documentation/](../).
+
 ## Summary
 A technical assessment of the Document Tracking System's resilience against future quantum-based attacks. This document explains the vulnerabilities of classical "Asymmetric" cryptography, the relative safety of "Symmetric" hashing, and the project's roadmap for transitioning to **Post-Quantum Cryptography (PQC)**.
 

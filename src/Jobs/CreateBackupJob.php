@@ -9,14 +9,6 @@ class CreateBackupJob
         ini_set('memory_limit', '2G');
         set_time_limit(1200);
 
-        // Simple mysqldump wrapper
-        $config = require BASE_PATH . '/src/Config/config.php';
-        $dbConfig = $config['database'];
-        $host = escapeshellarg($dbConfig['host']);
-        $user = escapeshellarg($dbConfig['user']);
-        $pass = escapeshellarg($dbConfig['password']);
-        $dbname = escapeshellarg($dbConfig['dbname']);
-
         $backupDir = BASE_PATH . '/storage/app/backups';
         if (!is_dir($backupDir)) mkdir($backupDir, 0777, true);
 
@@ -27,13 +19,11 @@ class CreateBackupJob
         $filePath = $backupDir . '/' . $filename;
         $zipPath = $backupDir . '/' . $filename . '.zip';
 
-        // Dump DB using MYSQL_PWD environment variable to prevent password disclosure warnings on stderr
-        $envPrefix = $dbConfig['password'] !== '' ? "MYSQL_PWD=" . escapeshellarg($dbConfig['password']) . " " : "";
-        $command = "{$envPrefix}mysqldump --single-transaction --quick -h {$host} -u {$user} {$dbname} > " . escapeshellarg($filePath) . " 2>&1";
-        exec($command, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            throw new \Exception("Database backup failed: " . implode("\n", $output));
+        try {
+            MysqlCli::run('mysqldump', ['--single-transaction', '--quick'], null, $filePath);
+        } catch (\Throwable $e) {
+            @unlink($filePath);
+            throw new \Exception("Database backup failed: " . $e->getMessage());
         }
 
         // Zip it

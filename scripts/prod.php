@@ -5,7 +5,7 @@ require_once __DIR__ . '/server-lib.php';
 // Populated once the Linux branch detects the PHP version
 $GLOBALS['fpmService'] = 'php-fpm';
 
-// PCNTL is unavailable on Windows (where prod mode exits below anyway)
+// PCNTL is Linux-only; Windows Ctrl+C handling lives in server-lib.php
 if (extension_loaded('pcntl')) {
     // Enable asynchronous signal handling
     pcntl_async_signals(true);
@@ -19,19 +19,27 @@ if (extension_loaded('pcntl')) {
             shell_exec("sudo service $fpmService stop");
             shell_exec('pkill -f nginx');
             shell_exec('pkill -f php-fpm');
-            echo "✅ NGINX & PHP-FPM stopped cleanly. Goodbye!\n";
+            shell_exec("pkill -f 'php " . projectRoot() . "/console.php'");
+            echo "✅ NGINX, PHP-FPM & worker stopped cleanly. Goodbye!\n";
             exit(0);
         });
     }
 }
 
-try {
-    $os   = PHP_OS_FAMILY;
-    $port = 8000;
+// The queue worker runs alongside the web server unless an external
+// supervisor (systemd / supervisord) manages it: `composer run prod -- --no-worker`
+$withWorker = !in_array('--no-worker', $argv, true);
 
-    if ($os === 'Windows') {
-        echo "❌ Production mode is not supported on Windows.\n";
-        exit(1);
+try {
+    $port = DTS_PORT;
+
+    if (isWindows()) {
+        echo "🚀 [Production] Starting NGINX + php-cgi...\n";
+        if (!runWindowsNginx($withWorker, 'Production')) {
+            echo "❌ Production mode needs NGINX. Unzip nginx for Windows to C:\\nginx or set NGINX_PATH in .env.\n";
+            exit(1);
+        }
+        exit(0);
     }
 
     echo "🚀 [Production] Starting NGINX & PHP-FPM...\n";
@@ -52,17 +60,20 @@ try {
     ensureSslCert($lanIp);
 
     // Install the project NGINX config (substitutes placeholders)
-    installNginxConfig(realpath(__DIR__ . '/..'), $phpVersion, $lanIp);
+    installNginxConfig(projectRoot(), $phpVersion, $lanIp);
 
     echo "▶️  Ensuring NGINX is running...\n";
     executeCommand("sudo service nginx restart");
+
+    if ($withWorker) {
+        startQueueWorker();
+    }
 
     echo "\n✅ Production Server is running!\n";
     echo "   Local:   https://localhost:$port\n";
     echo "   Network: https://$lanIp:$port\n";
     echo "   ⚠️  Other devices: open the URL, click Advanced → Accept the risk.\n\n";
 
-    // In production the queue worker is managed externally (e.g. systemd / supervisor).
     // Keep this process alive so the composer script doesn't exit and stop services.
     echo "⏳ Keeping process alive. Press Ctrl+C to stop.\n";
     while (true) {
