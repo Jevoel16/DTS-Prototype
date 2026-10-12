@@ -28,7 +28,7 @@ $wrapperClasses = $tableConfig['wrapper_classes'] ?? 'overflow-x-auto';
 ?>
 
 <div class="<?= htmlspecialchars($wrapperClasses) ?>">
-    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed border dark:border-gray-700">
+    <table class="w-full min-w-[720px] divide-y divide-gray-200 dark:divide-gray-700 table-fixed border dark:border-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-700">
             <tr>
                 <?php foreach ($columns as $column): ?>

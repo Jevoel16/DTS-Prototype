@@ -11,7 +11,7 @@ $nextUrl = $paginator->getNextUrl();
 $items = $paginator->getItems();
 ?>
 
-<nav role="navigation" aria-label="Pagination Navigation" class="flex items-center justify-between">
+<nav role="navigation" aria-label="Pagination Navigation" class="flex flex-wrap items-center justify-between gap-3">
     <div>
         <p class="text-sm text-gray-700 dark:text-gray-400 leading-5">
             <?php if (isset($_GET['cursor'])): ?>

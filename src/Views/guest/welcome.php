@@ -2,7 +2,7 @@
     <div class="bg-primary text-white p-4 font-semibold text-lg">
         Start a New Document Request
     </div>
-    <div class="p-6">
+    <div class="p-4 sm:p-6">
         <form method="POST" action="/submit-document">
     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
             
@@ -92,7 +92,7 @@
             <hr class="my-6 border-gray-200 dark:border-gray-700">
             
             <div class="space-y-4">
-                <button type="submit" class="w-full bg-primary hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-md">
+                <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded transition duration-200 shadow-md">
                     Submit Request
                 </button>
                 <button type="button" onclick="document.getElementById('track-modal').classList.remove('hidden')" class="w-full bg-gray-500 hover:bg-accent-2 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-md">
@@ -105,7 +105,7 @@
 
 <!-- Track Modal -->
 <div id="track-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-    <div class="relative mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800 dark:border-gray-700">
+    <div class="relative mx-auto p-5 border w-full max-w-sm shadow-lg rounded-md bg-white dark:bg-gray-800 dark:border-gray-700">
         <div class="mt-3 text-center">
             <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Track a Document</h3>
             <form id="track-document-form" class="mt-4">
@@ -114,7 +114,7 @@
                     <input type="text" id="tracking_code_input" class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white sm:text-sm" placeholder="e.g., DEPED-A1B2C3D4E5" required>
                 </div>
                 
-                <div id="track-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 text-sm text-left"></div>
+                <div id="track-error-message" class="hidden bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-300 px-4 py-3 rounded relative mb-4 text-sm text-left"></div>
 
                 <div class="mb-4">
                     <button type="button" id="scan-qr-button" class="w-full border border-primary text-primary hover:bg-primary hover:text-white font-medium py-2 px-4 rounded transition duration-200 flex items-center justify-center dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white">
@@ -127,7 +127,7 @@
                     <button type="button" onclick="document.getElementById('track-modal').classList.add('hidden')" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-accent-2 text-gray-800 dark:text-gray-200 font-medium py-2 px-4 rounded">
                         Close
                     </button>
-                    <button type="submit" class="bg-primary hover:bg-blue-700 text-white font-medium py-2 px-4 rounded">
+                    <button type="submit" class="bg-primary hover:bg-primary-hover text-white font-medium py-2 px-4 rounded">
                         Track
                     </button>
                 </div>
@@ -139,7 +139,7 @@
 <!-- QR Scanner Modal -->
 <div id="qr-scanner-modal" class="qr-modal">
     <div class="qr-modal-content">
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
             <h3 class="text-lg font-medium">Scan QR Code</h3>
             <button id="close-qr-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>

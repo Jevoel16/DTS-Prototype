@@ -74,22 +74,22 @@
         </button>
     </div>
 
-    <div class="container mx-auto px-4 py-10 max-w-4xl">
+    <div class="container mx-auto px-4 pt-20 pb-10 sm:py-10 max-w-4xl">
         <div class="text-center mb-10 flex flex-col items-center">
             <img src="/images/logoipsum-411.png" alt="DTS Logo" class="h-16 w-auto mb-4 dark:brightness-200">
-            <h1 class="text-3xl font-bold">Document Tracking System</h1>
-            <p class="text-lg text-gray-600 dark:text-gray-400">DepEd Division of Iligan City</p>
+            <h1 class="text-2xl sm:text-3xl font-bold">Document Tracking System</h1>
+            <p class="text-base sm:text-lg text-gray-600 dark:text-gray-400">DepEd Division of Iligan City</p>
         </div>
 
         <?php if (isset($_SESSION['error'])): ?>
-            <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <div class="mb-6 bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-300 px-4 py-3 rounded relative" role="alert">
                 <span class="block sm:inline"><?= htmlspecialchars($_SESSION['error']) ?></span>
             </div>
             <?php unset($_SESSION['error']); ?>
         <?php endif; ?>
 
         <?php if (isset($_SESSION['info'])): ?>
-            <div class="mb-6 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative" role="alert">
+            <div class="mb-6 bg-blue-100 border border-blue-400 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700/50 dark:text-blue-300 px-4 py-3 rounded relative" role="alert">
                 <span class="block sm:inline"><?= htmlspecialchars($_SESSION['info']) ?></span>
             </div>
             <?php unset($_SESSION['info']); ?>

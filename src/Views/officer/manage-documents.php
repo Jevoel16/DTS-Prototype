@@ -6,11 +6,11 @@
 
 <?php ob_start(); ?>
 
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
         
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6 text-gray-900 dark:text-gray-100">
+            <div class="p-4 sm:p-6 text-gray-900 dark:text-gray-100">
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
@@ -25,7 +25,7 @@
                         <p><strong>Submitter:</strong> <?php echo $guestName; ?> (<?php echo $guestEmail; ?>)</p>
                         <p><strong>Purpose:</strong> <?php echo htmlspecialchars($document['purpose_name'] ?? 'Unknown'); ?></p>
                         <p><strong>Submitted:</strong> <?php echo date('M d, Y h:i A', strtotime($document['created_at'])); ?></p>
-                        <p><strong>Status:</strong> <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800"><?php echo ucfirst($document['status']); ?></span></p>
+                        <p><strong>Status:</strong> <?php $status = $document['status']; require BASE_PATH . '/src/Views/components/status-badge.php'; ?></p>
                     </div>
 
                     <!-- Route Management Form -->
@@ -80,7 +80,7 @@
                                     </div>
                                 </div>
 
-                                <div class="mt-6 flex space-x-4">
+                                <div class="mt-6 flex flex-wrap gap-4">
                                     <button type="submit" class="inline-flex items-center px-4 py-2 bg-accent-1 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-accent-1-hover active:bg-accent-1-active focus:outline-none focus:border-accent-1-border-active focus:ring focus:ring-accent-1-light disabled:opacity-25 transition">
                                         Accept & Finalize Route
                                     </button>

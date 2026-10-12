@@ -83,12 +83,9 @@ function initAdminDashboard() {
                         title: { display: true, text: 'Document Count' },
                         ticks: {
                             showLabelBackdrop: true,
-                            backdropColor: 'rgba(255, 255, 255, 0.75)',
-                            color: '#1f2937', // Dark gray for text
+                            // Text and grid colors come from the theme-aware Chart.defaults set in layouts/app.php
+                            backdropColor: () => document.documentElement.classList.contains('dark') ? 'rgba(31, 41, 55, 0.75)' : 'rgba(255, 255, 255, 0.75)',
                             z: 1 // Ensure ticks are above the chart segments
-                        },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)' // Light grid lines
                         }
                     }
                 },

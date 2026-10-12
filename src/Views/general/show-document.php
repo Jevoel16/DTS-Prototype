@@ -1,5 +1,5 @@
 <?php $title = 'Document — ' . ($document['tracking_code'] ?? 'Details'); ob_start(); ?>
-<div class="flex justify-between items-center w-full">
+<div class="flex flex-wrap justify-between items-center gap-3 w-full">
     <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
         Document Details: <?php echo htmlspecialchars($document['tracking_code']); ?>
     </h2>
@@ -29,10 +29,10 @@
 <?php $header = ob_get_clean(); ?>
 
 <?php ob_start(); ?>
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6 text-gray-900 dark:text-gray-100">
+            <div class="p-4 sm:p-6 text-gray-900 dark:text-gray-100">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Document Information -->
                     <div>
@@ -86,7 +86,7 @@
                                     <!-- Step 1: Intake -->
                                     <li class="flex items-center justify-between text-gray-700 dark:text-gray-300">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-mono text-gray-500 w-5">1.</span>
+                                            <span class="font-mono text-gray-500 dark:text-gray-400 w-5">1.</span>
                                             <span>Intake</span>
                                         </div>
                                         <div>
@@ -97,7 +97,7 @@
                                     <!-- Step 2: Records Unit (Intake) -->
                                     <li class="flex items-center justify-between text-gray-700 dark:text-gray-300">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-mono text-gray-500 w-5">2.</span>
+                                            <span class="font-mono text-gray-500 dark:text-gray-400 w-5">2.</span>
                                             <span>Records Unit (Intake)</span>
                                         </div>
                                         <div>
@@ -108,7 +108,7 @@
                                     <?php foreach ($route as $index => $step): ?>
                                         <li class="flex items-center justify-between <?php echo ($index + 1) === $currentStep ? 'font-bold text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'; ?>">
                                             <div class="flex items-center gap-2">
-                                                <span class="font-mono text-gray-500 font-normal w-5"><?= $index + 3 ?>.</span>
+                                                <span class="font-mono text-gray-500 dark:text-gray-400 font-normal w-5"><?= $index + 3 ?>.</span>
                                                 <span>
                                                     <?php 
                                                     $displayName = $step['name'];
@@ -131,7 +131,7 @@
 
                                     <li class="flex items-center justify-between <?php echo $currentStep > count($route) ? 'font-bold text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'; ?>">
                                         <div class="flex items-center gap-2">
-                                            <span class="font-mono text-gray-500 font-normal w-5"><?= count($route) + 3 ?>.</span>
+                                            <span class="font-mono text-gray-500 dark:text-gray-400 font-normal w-5"><?= count($route) + 3 ?>.</span>
                                             <span>Records Unit (Releasing)</span>
                                         </div>
                                         <div>
@@ -150,8 +150,8 @@
 
                 <!-- Document Logs -->
                 <div class="mt-8">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-2xl font-bold">Document History</h3>
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                        <h3 class="text-xl sm:text-2xl font-bold">Document History</h3>
                         <div class="flex items-center space-x-2">
                             <a href="/documents/<?php echo htmlspecialchars($document['tracking_code']); ?>/hash-chain" class="inline-flex items-center px-4 py-2 bg-accent-1 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-accent-1-hover active:bg-accent-1-active focus:outline-none focus:ring-2 focus:ring-accent-1 transition ease-in-out duration-150">
                                 View Hash Chain

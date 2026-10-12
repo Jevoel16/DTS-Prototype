@@ -11,7 +11,10 @@ module.exports = {
             sans: ['"DM Sans"', 'sans-serif'],
         },
         colors: {
-            primary: '#004281',
+            primary: {
+                DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
+                hover: 'rgb(var(--color-primary-hover) / <alpha-value>)',
+            },
             secondary: '#f8f9fa',
             darkBg: '#111827',
             'accent-1': {

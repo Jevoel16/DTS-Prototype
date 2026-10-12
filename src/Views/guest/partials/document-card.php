@@ -71,7 +71,7 @@ if ($status === 'pending') {
 
 <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 document-card mb-6" data-tracking-code="<?= htmlspecialchars($document['tracking_code']) ?>" data-status="<?= htmlspecialchars($status) ?>" data-current-step="<?= htmlspecialchars($currentStep) ?>">
     <div class="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 text-center">
-        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Document Status: <?= htmlspecialchars($document['tracking_code']) ?></h2>
+        <h2 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100 break-words">Document Status: <?= htmlspecialchars($document['tracking_code']) ?></h2>
     </div>
     <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -93,8 +93,8 @@ if ($status === 'pending') {
         <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Tracking History</h3>
 
         <?php if ($wasJustRerouted): ?>
-            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded-r">
-                <p class="text-sm text-blue-700 flex items-center">
+            <div class="bg-blue-50 border-l-4 border-blue-400 dark:bg-blue-900/30 dark:border-blue-500 p-4 mb-4 rounded-r">
+                <p class="text-sm text-blue-700 dark:text-blue-300 flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
                     This document's route was just updated for additional processing and is now in transit.
                 </p>
@@ -103,22 +103,22 @@ if ($status === 'pending') {
 
         <div class="py-4">
             <?php if ($status == 'pending'): ?>
-                <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded text-center">
+                <div class="bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700/50 dark:text-blue-300 px-4 py-3 rounded text-center">
                     This document has been submitted and is waiting to be accepted by a Records Officer. The route will be displayed here once it is finalized.
                 </div>
             <?php elseif ($status == 'declined'): ?>
-                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-center">
+                <div class="bg-red-50 border border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-300 px-4 py-3 rounded text-center">
                     <h4 class="font-bold mb-1">Document Declined</h4>
                     <p><strong>Reason:</strong> <?= htmlspecialchars($document['decline_reason'] ?? 'No reason provided.') ?></p>
                     <p class="text-sm mt-2 opacity-80">For more information and to retrieve your document, please visit the Records Section.</p>
                 </div>
             <?php elseif ($isFinalTransit): ?>
-                <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded text-center">
+                <div class="bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700/50 dark:text-blue-300 px-4 py-3 rounded text-center">
                     <h4 class="font-bold mb-1">Processing Finished</h4>
                     <p>All processing steps are complete. The document is now in transit back to the Records Department to be ready for releasing.</p>
                 </div>
             <?php elseif ($status == 'ready_for_release'): ?>
-                <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded text-center">
+                <div class="bg-green-50 border border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-700/50 dark:text-green-300 px-4 py-3 rounded text-center">
                     <h4 class="font-bold mb-1">Processing Complete!</h4>
                     <p>Your document has finished internal processing and is now ready for release at the Records Department.</p>
                 </div>
@@ -245,7 +245,7 @@ if ($status === 'pending') {
                                                 $isCurrent = $displayCurrentStep == $stepNum;
                                                 $textColor = $isCompleted ? 'text-green-600 dark:text-green-400' : ($isCurrent ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400');
                                             ?>
-                                            <div class="text-sm font-semibold <?= $textColor ?> leading-tight px-1 break-words">
+                                            <div class="text-[11px] sm:text-sm font-semibold <?= $textColor ?> leading-tight px-1 break-words">
                                                 <?= htmlspecialchars($step['name']) ?>
                                             </div>
                                         <?php endif; ?>
@@ -256,7 +256,7 @@ if ($status === 'pending') {
                                 <?php foreach ($chunkData['steps'] as $step): ?>
                                     <div class="flex flex-col items-center">
                                         <?php if ($step && $step['timestamp']): ?>
-                                            <div class="text-xs text-gray-400 dark:text-gray-500 mt-1 px-1 text-center">
+                                            <div class="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1 px-1 text-center">
                                                 <?= htmlspecialchars($step['timestamp']) ?>
                                             </div>
                                         <?php endif; ?>

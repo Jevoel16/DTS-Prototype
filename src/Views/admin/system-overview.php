@@ -4,15 +4,15 @@
 </h2>
 <?php $header = ob_get_clean();
 ob_start(); ?>
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6 text-gray-900 dark:text-gray-100">
+            <div class="p-4 sm:p-6 text-gray-900 dark:text-gray-100">
                 <div class="space-y-6">
                     <!-- Section: System Status Overview -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Failed Jobs -->
-                        <div class="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-lg shadow">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 p-4 sm:p-6 rounded-lg shadow">
                             <h4 class="text-lg font-bold mb-2">Failed Jobs</h4>
                             <div class="flex items-center justify-between">
                                 <p class="text-3xl font-semibold <?= $appHealthMetrics['failed_jobs_count'] > 0 ? 'text-red-500' : '' ?>"><?= htmlspecialchars($appHealthMetrics['failed_jobs_count']) ?></p>
@@ -24,7 +24,7 @@ ob_start(); ?>
                             </div>
                         </div>
                         <!-- Cache Status -->
-                        <div class="bg-gray-50 dark:bg-gray-700/50 p-6 rounded-lg shadow">
+                        <div class="bg-gray-50 dark:bg-gray-700/50 p-4 sm:p-6 rounded-lg shadow">
                             <h4 class="text-lg font-bold mb-2">Cache Status</h4>
                             <?php if($appHealthMetrics['cache_status']): ?>
                                 <p class="text-3xl font-semibold text-green-500">Operational</p>
@@ -37,7 +37,7 @@ ob_start(); ?>
                     <!-- Section: Failed Jobs Details (Conditional) -->
                     <?php if($appHealthMetrics['failed_jobs_count'] > 0): ?>
                         <div id="failed-jobs-details" class="bg-red-50 dark:bg-red-900/10 pt-3 px-5 pb-5 rounded-lg shadow hidden">
-                            <div class="flex justify-between items-center mb-4 border-b border-red-200 dark:border-red-800 pb-2">
+                            <div class="flex flex-wrap justify-between items-center gap-3 mb-4 border-b border-red-200 dark:border-red-800 pb-2">
                                 <h3 class="text-xl font-bold text-red-700 dark:text-red-400">Failed Jobs Details</h3>
                                 <form action="/system-health/failed-jobs/delete-all" method="POST" class="confirm-action" data-message="Are you sure you want to clear ALL failed jobs?">
     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
@@ -108,7 +108,7 @@ ob_start(); ?>
                          class="bg-gray-50 dark:bg-gray-700/50 pt-5 px-5 pb-5 rounded-lg shadow"
                          data-url="/api/system-health/db-performance">
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 w-full mb-6">
-                            <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap shrink-0">
+                            <h3 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap shrink-0">
                                 Database Performance
                             </h3>
 
@@ -139,7 +139,7 @@ ob_start(); ?>
                     <div class="bg-gray-50 dark:bg-gray-700/50 pt-3 px-5 pb-5 rounded-lg shadow">
                         <h3 class="text-xl font-bold mb-4 border-b border-gray-200 dark:border-gray-600 pb-2">Database Integrity</h3>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                            <div class="md:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-inner">
+                            <div class="md:col-span-1 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-inner">
                                 <h3 class="text-lg font-bold mb-4 text-center">Verification Status</h3>
                                 <div id="integrity-status-container" class="text-center">
                                     <div class="text-5xl font-bold <?= $integrityCheckResult['verified_percentage'] == 100 && ($integrityCheckResult['live_state_errors_count'] ?? 0) == 0 ? 'text-green-500' : 'text-red-500' ?>" id="verified-percentage">
@@ -174,7 +174,7 @@ ob_start(); ?>
                                     </button>
                                 </div>
                             </div>
-                            <div class="md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-inner">
+                            <div class="md:col-span-2 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-inner">
                                 <h3 class="text-lg font-bold mb-4">How it Works</h3>
                                 <p class="text-sm text-gray-600 dark:text-gray-300">
                                     This tool provides a powerful way to verify the integrity of the document tracking system's data. It leverages a "hash chain" mechanism and an "Active State Comparison" to ensure that records are immutable and tamper-proof.
@@ -193,7 +193,7 @@ ob_start(); ?>
                     <!-- Section: Integrity Issues -->
                     <?php if (!empty($paginatedIssues)): ?>
                         <div class="bg-red-50 dark:bg-red-900/20 pt-3 px-5 pb-5 rounded-lg shadow">
-                            <div class="flex justify-between items-center mb-4 border-b border-red-200 dark:border-red-700 pb-2">
+                            <div class="flex flex-wrap justify-between items-center gap-3 mb-4 border-b border-red-200 dark:border-red-700 pb-2">
                                 <h3 class="text-xl font-bold text-red-600 dark:text-red-400">Integrity Issues Detected</h3>
                                 <form action="/system-health/freeze-all" method="POST" class="sign-action" data-message="Enter your Security PIN to digitally sign and freeze ALL documents with integrity issues.">
                                     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
@@ -289,11 +289,11 @@ $modalContent = '
         <svg class="mx-auto h-12 w-12 text-accent-1 animate-pulse mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h4 class="text-lg font-bold text-gray-900 mb-2">Analyzing cryptographic integrity...</h4>
+        <h4 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">Analyzing cryptographic integrity...</h4>
         <div class="w-full bg-gray-200 rounded-full h-4 mb-4 dark:bg-gray-700">
             <div id="integrity-progress-bar" class="bg-accent-1 h-4 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
         </div>
-        <p id="integrity-progress-text" class="text-sm text-gray-500">Initializing check...</p>
+        <p id="integrity-progress-text" class="text-sm text-gray-500 dark:text-gray-400">Initializing check...</p>
         <p id="integrity-progress-time" class="text-xs text-gray-400 mt-2 font-mono"></p>
     </div>
 ';

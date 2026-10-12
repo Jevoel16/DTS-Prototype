@@ -4,8 +4,8 @@
 </h2>
 <?php $header = ob_get_clean(); ?>
 <?php ob_start(); ?>
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
         
         <?php require BASE_PATH . '/src/Views/components/department-analytics.php'; ?>
 

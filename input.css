@@ -12,6 +12,10 @@
 
 @layer base {
   :root {
+    /* primary (DepEd brand navy) */
+    --color-primary: 0 66 129; /* #004281 */
+    --color-primary-hover: 29 78 216; /* blue-700 */
+
     /* accent-1 (Primary/Indigo) */
     --color-accent-1: 79 70 229; /* 600 */
     --color-accent-1-hover: 99 102 241; /* 500 */
@@ -34,6 +38,10 @@
   }
 
   .dark {
+    /* primary (lifted so it reads on dark surfaces) */
+    --color-primary: 37 99 235; /* blue-600 */
+    --color-primary-hover: 59 130 246; /* blue-500 */
+
     /* accent-1 (Primary/Indigo - Adjusted for dark mode contrast) */
     --color-accent-1: 129 140 248; /* 400 (brighter for text/bg contrast) */
     --color-accent-1-hover: 165 180 252; /* 300 */

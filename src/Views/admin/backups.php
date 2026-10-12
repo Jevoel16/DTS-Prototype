@@ -5,8 +5,8 @@
 <?php $header = ob_get_clean(); ?>
 
 <?php ob_start(); ?>
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
         <!-- Action Buttons -->
         <div class="flex justify-end mb-6">
             <form id="create-backup-form" action="/system/backups/create" method="POST">
@@ -18,27 +18,27 @@
         </div>
 
         <?php if (isset($_SESSION['success'])): ?>
-            <div id="success-message" class="mb-4 p-4 bg-success-light text-success-active rounded-lg">
+            <div id="success-message" class="mb-4 p-4 bg-success-light text-success-active dark:bg-green-900/30 dark:text-green-300 rounded-lg">
                 <?= htmlspecialchars($_SESSION['success']) ?>
                 <?php unset($_SESSION['success']); ?>
             </div>
         <?php endif; ?>
 
         <?php if (isset($_SESSION['error'])): ?>
-            <div class="mb-4 p-4 bg-red-100 text-red-800 rounded-lg">
+            <div class="mb-4 p-4 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-lg">
                 <?= htmlspecialchars($_SESSION['error']) ?>
                 <?php unset($_SESSION['error']); ?>
             </div>
         <?php endif; ?>
 
         <!-- Backup List -->
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6 text-gray-900">
+        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="p-4 sm:p-6 text-gray-900 dark:text-gray-100">
                 <h3 class="text-lg font-semibold mb-4">Available Backups</h3>
                 <form action="/system/backups" method="GET" class="mb-4">
-                    <div class="flex items-center space-x-4">
-                        <input type="text" name="search" placeholder="Search by file name or date" class="border-gray-300 focus:border-accent-1 rounded-md shadow-sm" value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
-                        <a href="/system/backups" class="text-gray-500 hover:text-gray-700">Clear</a>
+                    <div class="flex flex-wrap items-center gap-4">
+                        <input type="text" name="search" placeholder="Search by file name or date" class="w-full sm:w-80 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:border-accent-1 focus:ring-accent-1 rounded-md shadow-sm p-2" value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+                        <a href="/system/backups" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Clear</a>
                     </div>
                 </form>
                 <?php
@@ -48,10 +48,10 @@
                         $backup['actions_html'] = sprintf('
                             <div class="flex justify-end items-center space-x-4">
                                 <a href="/system/backups/download/%s" class="text-accent-1 hover:text-accent-1-active">Download</a>
-                                <button type="button" class="text-gray-500 hover:text-gray-700" onclick="openRestoreModal(\'%s\')">Restore</button>
+                                <button type="button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" onclick="openRestoreModal(\'%s\')">Restore</button>
                                 <form action="/system/backups/delete/%s" method="POST" class="confirm-action" data-message="Delete this backup?">
                                     <input type="hidden" name="csrf_token" value="' . ($_SESSION['csrf_token'] ?? '') . '">
-                                    <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+                                    <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                                 </form>
                             </div>
                         ', urlencode($backup['file_name']), htmlspecialchars($backup['file_name'], ENT_QUOTES), urlencode($backup['file_name']));
@@ -78,16 +78,16 @@
 
 <!-- Restore Modal -->
 <div id="restore-modal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75">
-    <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+    <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-xl max-w-md w-full">
         <form id="restore-form" method="POST" class="confirm-action" data-message="Restore database?">
     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
-            <h2 class="text-lg font-medium text-gray-900 text-red-500">FINAL WARNING: Restore Database?</h2>
-            <p class="mt-2 text-sm text-gray-600">
+            <h2 class="text-lg font-medium text-red-600 dark:text-red-400">FINAL WARNING: Restore Database?</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 Restore <strong id="restore-file-name"></strong>?
             </p>
             <div class="mt-6 flex justify-end space-x-2">
-                <button type="button" onclick="document.getElementById('restore-modal').style.display='none'" class="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-md">Restore Now</button>
+                <button type="button" onclick="document.getElementById('restore-modal').style.display='none'" class="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-md transition">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md transition">Restore Now</button>
             </div>
         </form>
     </div>

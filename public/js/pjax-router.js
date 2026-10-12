@@ -173,6 +173,15 @@
                 currentNav.innerHTML = newNav.innerHTML;
             }
 
+            const newMobileNav = newDoc.getElementById('pjax-mobile-nav-links');
+            const currentMobileNav = document.getElementById('pjax-mobile-nav-links');
+            if (newMobileNav && currentMobileNav) {
+                currentMobileNav.innerHTML = newMobileNav.innerHTML;
+            }
+            if (typeof window.closeMobileMenu === 'function') {
+                window.closeMobileMenu();
+            }
+
             // Synchronize notification bell badge and dropdown list across PJAX swaps
             const newNotifBtn = newDoc.getElementById('notification-menu-button');
             const currentNotifBtn = document.getElementById('notification-menu-button');

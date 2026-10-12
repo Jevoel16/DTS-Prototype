@@ -5,27 +5,27 @@
 <?php $header = ob_get_clean(); ?>
 
 <?php ob_start(); ?>
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
         
         <?php if (isset($_SESSION['success'])): ?>
-            <div class="bg-success-light border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+            <div class="bg-success-light border border-green-400 text-green-700 dark:bg-green-900/30 dark:border-green-700/50 dark:text-green-300 px-4 py-3 rounded relative" role="alert">
                 <span class="block sm:inline"><?= htmlspecialchars($_SESSION['success']) ?></span>
                 <?php unset($_SESSION['success']); ?>
             </div>
         <?php endif; ?>
 
         <?php if (isset($_SESSION['error'])): ?>
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <div class="bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-300 px-4 py-3 rounded relative" role="alert">
                 <span class="block sm:inline"><?= htmlspecialchars($_SESSION['error']) ?></span>
                 <?php unset($_SESSION['error']); ?>
             </div>
         <?php endif; ?>
 
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg" id="users-section">
-            <div class="p-6 text-gray-900 dark:text-gray-100">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-2xl font-bold">All User Accounts</h3>
+            <div class="p-4 sm:p-6 text-gray-900 dark:text-gray-100">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                    <h3 class="text-xl sm:text-2xl font-bold">All User Accounts</h3>
                     <a href="/users/create" class="inline-flex items-center px-4 py-2 bg-accent-1 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-accent-1-hover active:bg-accent-1-active focus:outline-none focus:border-accent-1-border-active focus:ring focus:ring-accent-1-light disabled:opacity-25 transition">
                         Create User
                     </a>
@@ -51,7 +51,7 @@
                 <div id="users-table-body">
                     <?php
                         foreach ($users as &$user) {
-                            $roleColor = $user['role'] === 'admin' ? 'bg-red-100 text-red-800' : ($user['role'] === 'officer' ? 'bg-blue-100 text-blue-800' : 'bg-success-light text-success-active');
+                            $roleColor = $user['role'] === 'admin' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : ($user['role'] === 'officer' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-success-light text-success-active dark:bg-green-900/30 dark:text-green-300');
                             $user['role_html'] = sprintf('<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full %s uppercase">%s</span>', $roleColor, htmlspecialchars($user['role']));
                             
                             $user['account_html'] = sprintf('

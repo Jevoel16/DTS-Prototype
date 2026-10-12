@@ -218,7 +218,7 @@ function initStatistics() {
                 progressTime.textContent = 'Est. time remaining: Calculating...';
                 
                 closeReportModalBtn.textContent = 'Cancel Report';
-                closeReportModalBtn.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-50');
+                closeReportModalBtn.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-50', 'dark:bg-accent-2', 'dark:text-gray-200', 'dark:hover:bg-accent-2-hover');
                 closeReportModalBtn.classList.add('bg-red-500', 'text-white', 'hover:bg-red-600');
                 downloadBtnContainer.innerHTML = '';
 
@@ -345,7 +345,7 @@ function initStatistics() {
             
             closeReportModalBtn.textContent = 'Close';
             closeReportModalBtn.classList.remove('bg-red-500', 'text-white', 'hover:bg-red-600');
-            closeReportModalBtn.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-50');
+            closeReportModalBtn.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-50', 'dark:bg-accent-2', 'dark:text-gray-200', 'dark:hover:bg-accent-2-hover');
 
             if (success) {
                 progressBar.classList.remove('bg-accent-1');

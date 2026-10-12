@@ -7,12 +7,12 @@
 <?php $header = ob_get_clean(); ?>
 
 <?php ob_start(); ?>
-<div class="py-10">
-    <div class="mx-[20vh] sm:px-6 lg:px-8 space-y-6">
+<div class="py-6 sm:py-10">
+    <div class="px-4 sm:px-6 lg:px-8 xl:mx-[20vh] space-y-6">
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900 dark:text-gray-100">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-2xl font-bold">Global Analytics</h3>
+                <div class="p-4 sm:p-6 text-gray-900 dark:text-gray-100">
+                    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                        <h3 class="text-xl sm:text-2xl font-bold">Global Analytics</h3>
                         <form action="/clear-personal-cache" method="POST" class="confirm-action m-0" data-message="Are you sure you want to clear your dashboard cache? This will refresh your view but preserve others' caches.">
                             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
                             <button type="submit" class="inline-flex items-center px-3 py-1 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-accent-2 focus:outline-none transition">
@@ -174,7 +174,7 @@
                 <div class="inline-block w-full align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
                     <div class="px-6 pt-5 pb-4 sm:p-6">
                         <!-- Header -->
-                        <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                        <div class="flex flex-wrap justify-between items-center gap-3 border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
                             <h3 id="avg-tat-modal-title" class="text-xl font-bold text-gray-900 dark:text-white">
                                 Average Turnaround Time (TAT) by Department
                             </h3>

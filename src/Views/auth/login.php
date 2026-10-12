@@ -34,16 +34,16 @@
         </button>
     </div>
 
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0">
+    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-20 sm:pt-0 px-4 sm:px-0">
         <div class="flex items-center gap-4">
             <img src="/images/logoipsum-411.png" alt="DTS Logo" class="h-12 w-auto dark:brightness-200">
-            <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-200">DTS Prototype</h1>
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-200">DTS Prototype</h1>
         </div>
 
-        <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white dark:bg-gray-800 shadow-md overflow-hidden sm:rounded-lg">
+        <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white dark:bg-gray-800 shadow-md overflow-hidden rounded-lg">
             
             <?php if (isset($_SESSION['error'])): ?>
-                <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                <div class="mb-4 bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-300 px-4 py-3 rounded relative" role="alert">
                     <span class="block sm:inline"><?= htmlspecialchars($_SESSION['error']) ?></span>
                 </div>
                 <?php unset($_SESSION['error']); ?>
@@ -72,7 +72,7 @@
                 </div>
 
                 <div class="flex items-center justify-end mt-4">
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-accent-2-active focus:outline-none focus:ring-2 focus:ring-accent-1 focus:ring-offset-2 transition ease-in-out duration-150">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-accent-1 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-accent-1-hover focus:bg-accent-1-hover active:bg-accent-1-active focus:outline-none focus:ring-2 focus:ring-accent-1 focus:ring-offset-2 transition ease-in-out duration-150">
                         Log in
                     </button>
                 </div>
