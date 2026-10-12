@@ -17,6 +17,53 @@ if (!function_exists('e')) {
     }
 }
 
+if (!function_exists('refuse_in_production')) {
+    /**
+     * Stop a destructive dev/demo CLI script (seeders, tamper demo, load tests) when APP_ENV=production.
+     * Requires BASE_PATH to be defined.
+     */
+    function refuse_in_production(): void
+    {
+        $config = require BASE_PATH . '/src/Config/config.php';
+        if (($config['app']['env'] ?? 'local') === 'production') {
+            fwrite(STDERR, "Refusing to run " . basename($_SERVER['SCRIPT_NAME'] ?? 'this script') . " with APP_ENV=production.\n");
+            exit(1);
+        }
+    }
+}
+
+if (!function_exists('safe_back')) {
+    /**
+     * Redirect target for "go back": the Referer's path, but only when it points at this site.
+     * Prevents a forged Referer from turning redirects into an open redirect to another domain.
+     *
+     * @param string $fallback Local path used when there is no usable Referer
+     * @return string
+     */
+    function safe_back(string $fallback = '/'): string
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        if ($referer === '') {
+            return $fallback;
+        }
+
+        $parts = parse_url($referer);
+        $host = $parts['host'] ?? null;
+        $requestHost = parse_url('//' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST);
+        if ($parts === false || ($host !== null && strcasecmp($host, (string) $requestHost) !== 0)) {
+            return $fallback;
+        }
+
+        $path = $parts['path'] ?? '/';
+        // Reject protocol-relative or backslash tricks such as "//evil.com" or "/\evil.com"
+        if (!str_starts_with($path, '/') || str_starts_with($path, '//') || str_contains($path, '\\')) {
+            return $fallback;
+        }
+
+        return $path . (isset($parts['query']) ? '?' . $parts['query'] : '');
+    }
+}
+
 if (!function_exists('has_error')) {
     /**
      * Check if a specific form field triggered a validation or authentication error.

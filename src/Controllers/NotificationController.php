@@ -34,8 +34,9 @@ class NotificationController
                 'count' => count($unread)
             ]);
         } catch (\Throwable $e) {
+            error_log("Notification error: " . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Unable to load notifications.']);
         }
     }
 
@@ -65,8 +66,9 @@ class NotificationController
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
         } catch (\Throwable $e) {
+            error_log("Notification error: " . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Unable to load notifications.']);
         }
     }
 }

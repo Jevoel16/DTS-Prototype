@@ -103,8 +103,8 @@ class DocumentWorkflowService
                     }
                 }
 
-                // Generate a highly randomized 10-character tracking code
-                $trackingCode = 'DEPED-' . strtoupper(substr(sha1(uniqid('', true) . microtime()), 0, 10));
+                // 12 hex chars (48 bits) from the CSPRNG so codes cannot be predicted from the submission time
+                $trackingCode = 'DEPED-' . strtoupper(bin2hex(random_bytes(6)));
 
                 $guestInfo = json_encode([
                     'name' => $data['guest_name'],

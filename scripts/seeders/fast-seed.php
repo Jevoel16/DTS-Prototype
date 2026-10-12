@@ -2,6 +2,7 @@
 
 define('BASE_PATH', dirname(dirname(__DIR__)));
 require BASE_PATH . '/vendor/autoload.php';
+refuse_in_production();
 
 use App\Core\Database;
 use App\Core\IntegrityManager;
@@ -771,6 +772,9 @@ $conn->exec('SET FOREIGN_KEY_CHECKS = 1');
 
 echo "\n📈 Backfilling daily departmental metrics...\n";
 passthru('php ' . escapeshellarg(BASE_PATH . '/scripts/backfill-metrics.php') . ' --full');
+
+// Seal the new hash chains with APP_INTEGRITY_KEY (no-op when the key is not set)
+passthru('php ' . escapeshellarg(BASE_PATH . '/scripts/seal-logs.php'));
 
 $elapsed = round(microtime(true) - $startTime, 2);
 echo "🎉 Done! Seeded " . number_format($docsToCreate) . " documents in {$elapsed}s.\n";

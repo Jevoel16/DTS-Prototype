@@ -44,7 +44,7 @@ class StatisticsController
         header('Content-Type: application/json');
         try {
             $db = Database::getInstance();
-            $jobId = uniqid();
+            $jobId = bin2hex(random_bytes(16));
             $userId = $_SESSION['user_id'];
             $filtersJson = json_encode($_POST);
             
@@ -72,7 +72,7 @@ class StatisticsController
     {
         $jobId = $_GET['job_id'] ?? null;
         $db = Database::getInstance();
-        $status = $db->query("SELECT * FROM report_jobs WHERE id = :id", ['id' => $jobId])->fetch();
+        $status = $db->query("SELECT * FROM report_jobs WHERE id = :id AND user_id = :uid", ['id' => $jobId, 'uid' => $_SESSION['user_id']])->fetch();
         
         header('Content-Type: application/json');
         echo json_encode($status);
@@ -83,7 +83,7 @@ class StatisticsController
     {
         $jobId = $_POST['job_id'] ?? null;
         $db = Database::getInstance();
-        $db->query("UPDATE report_jobs SET status = 'cancelled' WHERE id = :id AND status IN ('queued', 'processing')", ['id' => $jobId]);
+        $db->query("UPDATE report_jobs SET status = 'cancelled' WHERE id = :id AND user_id = :uid AND status IN ('queued', 'processing')", ['id' => $jobId, 'uid' => $_SESSION['user_id']]);
         
         header('Content-Type: application/json');
         echo json_encode(['status' => 'success']);
@@ -93,7 +93,7 @@ class StatisticsController
     public function downloadReport($jobId)
     {
         $db = Database::getInstance();
-        $job = $db->query("SELECT * FROM report_jobs WHERE id = :id", ['id' => $jobId])->fetch();
+        $job = $db->query("SELECT * FROM report_jobs WHERE id = :id AND user_id = :uid", ['id' => $jobId, 'uid' => $_SESSION['user_id']])->fetch();
         
         if (!$job || $job['status'] !== 'completed') {
             header('Location: /statistics');

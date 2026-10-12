@@ -28,8 +28,20 @@ class RestoreBackupJob
         $sqlFile = null;
         if ($zip->open($zipPath) === TRUE) {
             $sqlFile = $zip->getNameIndex(0);
-            $zip->extractTo($backupDir);
+            // Only the expected dump file, never a path that could escape the backup folder
+            if (!$sqlFile || basename($sqlFile) !== $sqlFile || !str_ends_with($sqlFile, '.sql')) {
+                $zip->close();
+                throw new \Exception("Backup archive has unexpected contents.");
+            }
+            $password = (require BASE_PATH . '/src/Config/config.php')['app']['backup_password'];
+            if ($password !== '') {
+                $zip->setPassword($password);
+            }
+            $extracted = $zip->extractTo($backupDir, $sqlFile);
             $zip->close();
+            if (!$extracted) {
+                throw new \Exception("Could not extract the backup. Is BACKUP_PASSWORD the one it was created with?");
+            }
         }
 
         if ($sqlFile && file_exists($backupDir . '/' . $sqlFile)) {

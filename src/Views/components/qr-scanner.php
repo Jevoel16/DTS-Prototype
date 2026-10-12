@@ -21,7 +21,7 @@ $finderInputName = $finderInputName ?? 'tracking_code';
         <h3 class="text-xl sm:text-2xl font-bold mb-4"><?= htmlspecialchars($finderTitle) ?></h3>
         <p class="mb-6 text-gray-600 dark:text-gray-400"><?= htmlspecialchars($finderDescription) ?></p>
 
-        <form id="<?= htmlspecialchars($finderFormId) ?>" action="<?= htmlspecialchars($finderActionUrl) ?>" method="POST" onsubmit="this.elements['<?= htmlspecialchars($finderInputName) ?>'].value = this.elements['<?= htmlspecialchars($finderInputName) ?>'].value.trim()">
+        <form id="<?= htmlspecialchars($finderFormId) ?>" action="<?= htmlspecialchars($finderActionUrl) ?>" method="POST" data-trim-input="<?= htmlspecialchars($finderInputName) ?>">
             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
             <div>
                 <label for="<?= htmlspecialchars($finderInputName) ?>" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tracking Code</label>

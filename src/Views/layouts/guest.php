@@ -11,17 +11,7 @@
     <link rel="apple-touch-icon" href="/images/logoipsum-411.png">
 
     <link href="/css/tailwind.css" rel="stylesheet">
-    <script>
-        (function() {
-            const theme = localStorage.getItem('theme');
-            const isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        })();
-    </script>
+    <script src="/js/theme-init.js"></script>
     <style>
         .qr-modal {
             display: none; 
@@ -98,46 +88,10 @@
         <?= $content ?? '' ?>
     </div>
 
-    <script>
-        var themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-        var themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
-
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            themeToggleLightIcon.classList.remove('hidden');
-        } else {
-            themeToggleDarkIcon.classList.remove('hidden');
-        }
-
-        var themeToggleBtn = document.getElementById('theme-toggle');
-
-        themeToggleBtn.addEventListener('click', function() {
-            themeToggleDarkIcon.classList.toggle('hidden');
-            themeToggleLightIcon.classList.toggle('hidden');
-
-            if (localStorage.getItem('theme')) {
-                if (localStorage.getItem('theme') === 'light') {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
-            } else {
-                if (document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                }
-            }
-        });
-    </script>
     <?php if (isset($_SESSION['console_error'])): ?>
-        <script>
-            console.error(<?= json_encode($_SESSION['console_error']) ?>);
-        </script>
+        <script type="application/json" id="dts-console-error"><?= json_encode($_SESSION['console_error'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
         <?php unset($_SESSION['console_error']); ?>
     <?php endif; ?>
+    <script src="/js/common.js"></script>
 </body>
 </html>

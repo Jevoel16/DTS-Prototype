@@ -41,7 +41,7 @@
                             <p class="flex items-center">
                                 <strong>Tracking Code:</strong> 
                                 <span class="ml-1"><?php echo htmlspecialchars($document['tracking_code']); ?></span>
-                                <button onclick="const btn=this; btn.querySelector('.copy-icon').style.display='none'; btn.querySelector('.check-icon').style.display='block'; navigator.clipboard.writeText('<?php echo htmlspecialchars(addslashes($document['tracking_code'])); ?>'); setTimeout(() => { btn.querySelector('.copy-icon').style.display='block'; btn.querySelector('.check-icon').style.display='none'; }, 2000);" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none ml-2" title="Copy Tracking Code">
+                                <button data-copy-text="<?php echo htmlspecialchars($document['tracking_code']); ?>" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none ml-2" title="Copy Tracking Code">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>
@@ -188,38 +188,7 @@
         </div>
     </div>
 </div>
-<script>
-// Named so both DOMContentLoaded (hard load) and dts:page-loaded (PJAX swap)
-// can trigger re-binding of sign-action form handlers and back button origin.
-function initShowDocumentPage() {
-    const backBtn = document.getElementById('doc-back-button');
-    if (backBtn) {
-        const origin = sessionStorage.getItem('dts_doc_origin');
-        if (origin && origin !== window.location.pathname && !origin.includes('/documents/')) {
-            backBtn.setAttribute('href', origin);
-        }
-    }
-
-    document.querySelectorAll('form.sign-action').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            const pinInput = this.querySelector('.sign-pin-input');
-            if (pinInput && !pinInput.value) {
-                e.preventDefault();
-                const msg = this.dataset.message || "Enter your Security PIN to sign this action.";
-                window.SigningModal.show(msg, function(pin) {
-                    pinInput.value = pin;
-                    form.submit();
-                });
-            }
-        });
-    });
-}
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initShowDocumentPage);
-} else {
-    initShowDocumentPage();
-}
-</script>
+<script src="/js/show-document.js"></script>
 <?php require BASE_PATH . '/src/Views/partials/signing-modal.php'; ?>
 <?php $content = ob_get_clean(); ?>
 

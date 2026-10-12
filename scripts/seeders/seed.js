@@ -1,5 +1,9 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+if (process.env.APP_ENV === 'production') {
+    console.error('Refusing to run the dev seeder with APP_ENV=production.');
+    process.exit(1);
+}
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -673,7 +677,7 @@ async function timeTravelRetrofit(connection, documentIds) {
 
             const newHash = calculateLogHash(log.document_id, log.user_id, log.action, dates.iso, previousHash, log.document_state_hash, log.signature);
             
-            queries.push(`UPDATE document_logs SET created_at = ?, updated_at = ?, previous_hash = ?, hash = ? WHERE id = ?`);
+            queries.push(`UPDATE document_logs SET created_at = ?, updated_at = ?, previous_hash = ?, hash = ?, seal = NULL WHERE id = ?`);
             updateParams.push(dates.sql, dates.sql, previousHash, newHash, log.id);
 
             previousHash = newHash;
@@ -864,6 +868,10 @@ async function seed() {
 
         console.log('📈 Backfilling daily departmental metrics...');
         execSync(`php "${path.join(__dirname, '../backfill-metrics.php')}" --full`, { stdio: 'inherit' });
+
+        // Back-dating above rewrote the hashes; re-seal them with APP_INTEGRITY_KEY (no-op without a key)
+        console.log('🔏 Sealing document logs...');
+        execSync(`php "${path.join(__dirname, '../seal-logs.php')}"`, { stdio: 'inherit' });
 
         console.log('🔒 Resetting all digital signatures for first-time login...');
         await connection.query("UPDATE user_public_key_histories SET activated_at = '2020-01-01 00:00:00', deactivated_at = NOW(), updated_at = NOW() WHERE deactivated_at IS NULL");

@@ -56,7 +56,7 @@
                             
                             $user['account_html'] = sprintf('
                                 <div class="flex items-center space-x-3">
-                                    <button onclick="const btn=this; btn.querySelector(\'.copy-icon\').style.display=\'none\'; btn.querySelector(\'.check-icon\').style.display=\'block\'; navigator.clipboard.writeText(\'%s\'); setTimeout(() => { btn.querySelector(\'.copy-icon\').style.display=\'block\'; btn.querySelector(\'.check-icon\').style.display=\'none\'; }, 2000);" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none" title="Copy Email">
+                                    <button data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none" title="Copy Email">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
@@ -69,7 +69,7 @@
                                         <span class="text-xs text-gray-500 dark:text-gray-400 break-all">%s</span>
                                     </div>
                                 </div>
-                            ', htmlspecialchars(addslashes($user['email'])), htmlspecialchars($user['name']), htmlspecialchars($user['email']));
+                            ', htmlspecialchars($user['email']), htmlspecialchars($user['name']), htmlspecialchars($user['email']));
                             
                             if (!empty($user['public_key'])) {
                                 $user['signature_html'] = sprintf('
@@ -83,7 +83,7 @@
                                             <button type="submit" class="text-xs text-red-500 hover:text-red-700 underline">Reset</button>
                                         </form>
                                     </div>
-                                ', $user['id'], htmlspecialchars(addslashes($user['name'])));
+                                ', $user['id'], htmlspecialchars($user['name']));
                             } else {
                                 $user['signature_html'] = '<span class="text-gray-400 italic text-xs">Not set</span>';
                             }

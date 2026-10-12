@@ -30,6 +30,7 @@
         "proxy": "cloudflared tunnel --url https://localhost:8000 --no-tls-verify",
         "css": "npm run build",
         "migrate": "php scripts/migrate.php",
+        "seal": "php scripts/seal-logs.php",
         "corrupt": "php scripts/corrupt.php",
         "seed:dev": "node scripts/seeders/seed.js",
         "seed:fast": "php scripts/seeders/fast-seed.php",

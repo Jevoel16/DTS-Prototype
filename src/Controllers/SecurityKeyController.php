@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Core\Database;
+use App\Core\SecurityHelper;
 
 class SecurityKeyController
 {
@@ -11,8 +12,9 @@ class SecurityKeyController
         $pin = $_POST['pin'] ?? '';
         $pinConfirm = $_POST['pin_confirm'] ?? '';
         
-        if (strlen($pin) < 6) {
-            $_SESSION['error'] = "PIN must be at least 6 characters.";
+        $minLength = SecurityHelper::MIN_PIN_LENGTH;
+        if (strlen($pin) < $minLength) {
+            $_SESSION['error'] = "PIN must be at least {$minLength} characters.";
             $this->redirectBasedOnRole();
         }
 
@@ -23,26 +25,23 @@ class SecurityKeyController
 
         $db = Database::getInstance();
         $userId = $_SESSION['user_id'];
-        
+
+        // An existing signing key can only be replaced after an admin resets it; otherwise a hijacked
+        // session could swap in a key whose PIN the attacker knows and sign as this user.
+        $existing = $db->query("SELECT security_key_set_at FROM users WHERE id = :id", ['id' => $userId])->fetch();
+        if ($existing && $existing['security_key_set_at'] !== null) {
+            $_SESSION['error'] = "Your digital signature is already set up. Ask an administrator to reset it if you need a new one.";
+            $this->redirectBasedOnRole();
+        }
+
         $keypair = sodium_crypto_sign_keypair();
         $secretKey = sodium_crypto_sign_secretkey($keypair);
         $publicKey = sodium_crypto_sign_publickey($keypair);
 
-        // Encrypt the private key with the PIN using AES-256-CBC
-        $salt = random_bytes(SODIUM_CRYPTO_PWHASH_SALTBYTES);
-        $key = sodium_crypto_pwhash(
-            32, 
-            $pin, 
-            $salt, 
-            SODIUM_CRYPTO_PWHASH_OPSLIMIT_INTERACTIVE, 
-            SODIUM_CRYPTO_PWHASH_MEMLIMIT_INTERACTIVE, 
-            SODIUM_CRYPTO_PWHASH_ALG_ARGON2ID13
-        );
-        $iv = random_bytes(16);
-        $encryptedPriv = openssl_encrypt($secretKey, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-
+        // Encrypt the private key with a PIN-derived key (Argon2id + authenticated secretbox)
         $pubB64 = base64_encode($publicKey);
-        $privB64 = base64_encode($salt . $iv . $encryptedPriv);
+        $privB64 = SecurityHelper::encryptPrivateKey($secretKey, $pin);
+        sodium_memzero($secretKey);
         
         $now = date('Y-m-d H:i:s');
 
@@ -67,8 +66,8 @@ class SecurityKeyController
             'now3' => $now
         ]);
 
-        // Fix: Update the session with the new private key so client-side JS can use it without requiring re-login
-        $_SESSION['private_key'] = $privB64;
+        // A new key resets any PIN lockout from the old one
+        \App\Core\RateLimiter::clear("pin:user:{$userId}");
 
         // Fix: Clear the user's personal page cache. If we don't, CacheMiddleware might serve an old cached version 
         // of the dashboard containing the setup modal, causing it to pop up infinitely.

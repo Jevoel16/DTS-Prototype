@@ -2,12 +2,22 @@
 
 $appStartTime = microtime(true);
 
-// Front Controller & Session Hardening
+// Base Path Definition
+define('BASE_PATH', dirname(__DIR__));
+
+// Composer autoloader (also loads src/helpers.php via autoload.files)
+require BASE_PATH . '/vendor/autoload.php';
+
+$appConfig = require BASE_PATH . '/src/Config/config.php';
+
+// Front Controller & Session Hardening.
+// In production the cookie is always Secure, even if TLS ends at a proxy and PHP sees plain HTTP.
 session_start([
     'cookie_httponly' => true,
-    'cookie_secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    'cookie_secure'   => $appConfig['app']['env'] === 'production' || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on'),
     'cookie_samesite' => 'Strict',
     'use_strict_mode' => true,
+    'use_only_cookies' => true,
 ]);
 
 // CSRF Token Generation
@@ -18,14 +28,7 @@ if (empty($_SESSION['csrf_token'])) {
 // Hashes in document_logs include timestamps, so the timezone must never change
 date_default_timezone_set('Asia/Manila');
 
-// Base Path Definition
-define('BASE_PATH', dirname(__DIR__));
-
-// Composer autoloader (also loads src/helpers.php via autoload.files)
-require BASE_PATH . '/vendor/autoload.php';
-
 // Error display follows APP_DEBUG in .env (errors are always logged)
-$appConfig = require BASE_PATH . '/src/Config/config.php';
 $debug = $appConfig['app']['debug'];
 ini_set('display_errors', $debug ? '1' : '0');
 ini_set('display_startup_errors', $debug ? '1' : '0');
@@ -43,18 +46,28 @@ $router = new Router();
 
 // --- Auth Routes ---
 $router->get('/login', [App\Controllers\AuthController::class, 'showLogin']);
-$router->post('/login', [App\Controllers\AuthController::class, 'login']);
+$router->post('/login', [App\Controllers\AuthController::class, 'login'], [
+    App\Middleware\RateLimitMiddleware::class . ':login,20,60'
+]);
 $router->post('/logout', [App\Controllers\AuthController::class, 'logout']);
 
 // --- Guest / Public Routes ---
 $router->get('/', [App\Controllers\GuestController::class, 'welcome'], [
     App\Middleware\CacheMiddleware::class . ':55'
 ]);
-$router->post('/submit-document', [App\Controllers\GuestController::class, 'store']);
+$router->post('/submit-document', [App\Controllers\GuestController::class, 'store'], [
+    App\Middleware\RateLimitMiddleware::class . ':submit,10,3600'
+]);
 $router->get('/success', [App\Controllers\GuestController::class, 'success']);
-$router->get('/track', [App\Controllers\GuestController::class, 'track']);
-$router->get('/api/track/module/(?P<tracking_code>[A-Za-z0-9\-]+)', [App\Controllers\GuestController::class, 'getTrackedDocumentModule']);
-$router->get('/api/track/status', [App\Controllers\GuestController::class, 'getStatusUpdates']);
+$router->get('/track', [App\Controllers\GuestController::class, 'track'], [
+    App\Middleware\RateLimitMiddleware::class . ':track,60,60'
+]);
+$router->get('/api/track/module/(?P<tracking_code>[A-Za-z0-9\-]+)', [App\Controllers\GuestController::class, 'getTrackedDocumentModule'], [
+    App\Middleware\RateLimitMiddleware::class . ':track,60,60'
+]);
+$router->get('/api/track/status', [App\Controllers\GuestController::class, 'getStatusUpdates'], [
+    App\Middleware\RateLimitMiddleware::class . ':track,60,60'
+]);
 
 // Role-based dashboard redirect — routes each role to its dedicated landing page.
 $router->get('/dashboard', function() {
@@ -164,13 +177,7 @@ $router->get('/integrity-monitor', function() {
     App\Middleware\RoleMiddleware::class . ':admin'
 ]);
 
-// Profile & Security
-$router->get('/profile', [App\Controllers\ProfileController::class, 'edit'], [
-    App\Middleware\AuthMiddleware::class
-]);
-$router->post('/profile/update', [App\Controllers\ProfileController::class, 'update'], [
-    App\Middleware\AuthMiddleware::class
-]);
+// Security key setup
 $router->post('/security-key', [App\Controllers\SecurityKeyController::class, 'store'], [
     App\Middleware\AuthMiddleware::class
 ]);
@@ -278,7 +285,9 @@ $router->get('/documents/(?P<tracking_code>[A-Za-z0-9\-]+)/hash-chain', [App\Con
     App\Middleware\AuthMiddleware::class,
     App\Middleware\RoleMiddleware::class . ':admin,officer,staff'
 ]);
-$router->get('/documents/(?P<tracking_code>[A-Za-z0-9\-]+)/print-tracking-form', [App\Controllers\DocumentController::class, 'printTrackingForm']);
+$router->get('/documents/(?P<tracking_code>[A-Za-z0-9\-]+)/print-tracking-form', [App\Controllers\DocumentController::class, 'printTrackingForm'], [
+    App\Middleware\RateLimitMiddleware::class . ':pdf,20,600'
+]);
 
 $router->post('/documents/(?P<tracking_code>[A-Za-z0-9\-]+)/freeze', [App\Controllers\SystemHealthController::class, 'freeze'], [
     App\Middleware\AuthMiddleware::class,
@@ -376,16 +385,19 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 $router->dispatch($uri, $method);
 
-// Log Navigation Performance
-$appEndTime = microtime(true);
-$durationMs = round(($appEndTime - $appStartTime) * 1000);
-$referer = $_SERVER['HTTP_REFERER'] ?? 'direct';
-$refererPath = $referer !== 'direct' ? (parse_url($referer, PHP_URL_PATH) ?? '/') : 'direct';
-$currentPath = parse_url($uri, PHP_URL_PATH) ?? '/';
+// Log Navigation Performance (debug only: a synchronous file append on every request
+// doesn't scale; in production use the nginx access log instead)
+if ($debug) {
+    $appEndTime = microtime(true);
+    $durationMs = round(($appEndTime - $appStartTime) * 1000);
+    $referer = $_SERVER['HTTP_REFERER'] ?? 'direct';
+    $refererPath = $referer !== 'direct' ? (parse_url($referer, PHP_URL_PATH) ?? '/') : 'direct';
+    $currentPath = parse_url($uri, PHP_URL_PATH) ?? '/';
 
-$logDir = BASE_PATH . '/storage/logs';
-if (!is_dir($logDir)) {
-    mkdir($logDir, 0777, true);
+    $logDir = BASE_PATH . '/storage/logs';
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0770, true);
+    }
+    $logMessage = sprintf("[%s] %s to %s - %dms\n", date('Y-m-d H:i:s'), $refererPath, $currentPath, $durationMs);
+    file_put_contents($logDir . '/navigation.log', $logMessage, FILE_APPEND);
 }
-$logMessage = sprintf("[%s] %s to %s - %dms\n", date('Y-m-d H:i:s'), $refererPath, $currentPath, $durationMs);
-file_put_contents($logDir . '/navigation.log', $logMessage, FILE_APPEND);

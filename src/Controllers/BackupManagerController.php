@@ -10,7 +10,7 @@ class BackupManagerController
     {
         $backupDir = BASE_PATH . '/storage/app/backups';
         if (!is_dir($backupDir)) {
-            mkdir($backupDir, 0777, true);
+            mkdir($backupDir, 0770, true);
         }
 
         $files = array_diff(scandir($backupDir), ['.', '..']);
@@ -101,6 +101,21 @@ class BackupManagerController
     {
         $db = Database::getInstance();
         $safeFileName = basename($fileName);
+
+        // A restore overwrites the whole database: require the admin's signing PIN (with lockout)
+        $pin = \App\Core\SecurityHelper::resolvePin($_POST['pin'] ?? '');
+        if (empty($pin) || !file_exists(BASE_PATH . '/storage/app/backups/' . $safeFileName)) {
+            $_SESSION['error'] = 'Security PIN and an existing backup file are required.';
+            header('Location: /system/backups');
+            exit;
+        }
+        try {
+            \App\Core\IntegrityManager::signAction((int) $_SESSION['user_id'], $pin, 'ADMIN: Restore backup', hash('sha256', $safeFileName));
+        } catch (\Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
+            header('Location: /system/backups');
+            exit;
+        }
         $payload = json_encode(['class' => \App\Jobs\RestoreBackupJob::class, 'data' => [$safeFileName]]);
         $db->query("INSERT INTO jobs (queue, payload, attempts, available_at, created_at) VALUES ('default', :payload, 0, UNIX_TIMESTAMP(), UNIX_TIMESTAMP())", [
             'payload' => $payload

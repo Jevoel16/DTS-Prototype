@@ -4,6 +4,9 @@ namespace App\Core;
 
 class IntegrityManager
 {
+    private const MAX_FAILED_PINS = 5;
+    private const PIN_LOCKOUT_SECONDS = 900;
+
     /**
      * Calculate a SHA-256 hash representing the current state of a document.
      * This protects against tampering with document metadata (title, submitter, etc.).
@@ -78,6 +81,14 @@ class IntegrityManager
             throw new \Exception("Action Denied: Security PIN is required to digitally sign this action.");
         }
 
+        // Lock signing after repeated wrong PINs. Checked before the Argon2 derivation so guessing
+        // cannot also be used to exhaust server memory/CPU.
+        $pinThrottleKey = "pin:user:{$userId}";
+        if (RateLimiter::tooMany($pinThrottleKey, self::MAX_FAILED_PINS)) {
+            $minutes = (int) ceil(RateLimiter::availableIn($pinThrottleKey) / 60);
+            throw new \Exception("Too many incorrect PIN attempts. Signing is locked for {$minutes} minute(s).");
+        }
+
         $db = Database::getInstance();
         $user = $db->query("SELECT private_key FROM users WHERE id = :id", ['id' => $userId])->fetch();
 
@@ -85,34 +96,22 @@ class IntegrityManager
             throw new \Exception("User does not have a digital signature set up.");
         }
 
-        $decoded = base64_decode($user['private_key']);
-        
-        // Support both legacy AES-only format and the new Argon2-based key derivation format for backwards compatibility
-        if (strlen($decoded) === 64) {
-            $key = substr(hash('sha256', $pin), 0, 32);
-            $iv = str_repeat('0', 16);
-            $encryptedPriv = $decoded;
-        } elseif (strlen($decoded) === 112) {
-            $salt = substr($decoded, 0, SODIUM_CRYPTO_PWHASH_SALTBYTES);
-            $iv = substr($decoded, SODIUM_CRYPTO_PWHASH_SALTBYTES, 16);
-            $encryptedPriv = substr($decoded, SODIUM_CRYPTO_PWHASH_SALTBYTES + 16);
-            
-            $key = sodium_crypto_pwhash(
-                32, 
-                $pin, 
-                $salt, 
-                SODIUM_CRYPTO_PWHASH_OPSLIMIT_INTERACTIVE, 
-                SODIUM_CRYPTO_PWHASH_MEMLIMIT_INTERACTIVE, 
-                SODIUM_CRYPTO_PWHASH_ALG_ARGON2ID13
-            );
-        } else {
-            throw new \Exception("Invalid private key format.");
-        }
+        // Handles the current authenticated format and both legacy AES-CBC formats
+        $decryptedPriv = SecurityHelper::decryptPrivateKey($user['private_key'], $pin);
 
-        $decryptedPriv = openssl_decrypt($encryptedPriv, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
-
-        if ($decryptedPriv === false || strlen($decryptedPriv) !== 64) {
+        if ($decryptedPriv === null) {
+            // Recorded on a separate connection, so the caller's transaction rollback does not erase it
+            RateLimiter::hit($pinThrottleKey, self::MAX_FAILED_PINS, self::PIN_LOCKOUT_SECONDS);
             throw new \Exception("Invalid Security PIN or corrupted key.");
+        }
+        RateLimiter::clear($pinThrottleKey);
+
+        // Upgrade legacy key encryption now that the PIN is known (same key pair, so signatures are unaffected)
+        if (SecurityHelper::isLegacyKeyFormat($user['private_key'])) {
+            $db->query("UPDATE users SET private_key = :priv WHERE id = :id", [
+                'priv' => SecurityHelper::encryptPrivateKey($decryptedPriv, $pin),
+                'id' => $userId
+            ]);
         }
 
         // Generate a detached signature binding the action directly to the current state hash
@@ -167,12 +166,12 @@ class IntegrityManager
         ];
         $hash = hash('sha256', json_encode($dataToHash, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
-        // 5. Insert the log entry
+        // 5. Insert the log entry, sealed with the server-side key so the chain cannot be recomputed from the DB alone
         $db->query(
             "INSERT INTO document_logs 
-            (document_id, user_id, action, remarks, previous_hash, hash, signature, document_state_hash, document_snapshot, created_at) 
+            (document_id, user_id, action, remarks, previous_hash, hash, seal, signature, document_state_hash, document_snapshot, created_at)
             VALUES 
-            (:document_id, :user_id, :action, :remarks, :previous_hash, :hash, :signature, :document_state_hash, :document_snapshot, :created_at)",
+            (:document_id, :user_id, :action, :remarks, :previous_hash, :hash, :seal, :signature, :document_state_hash, :document_snapshot, :created_at)",
             [
                 ':document_id' => $documentId,
                 ':user_id' => $userId,
@@ -180,6 +179,7 @@ class IntegrityManager
                 ':remarks' => $remarks,
                 ':previous_hash' => $previousHash,
                 ':hash' => $hash,
+                ':seal' => self::sealFor($hash),
                 ':signature' => $signature,
                 ':document_state_hash' => $documentStateHash,
                 ':document_snapshot' => json_encode($documentData),
@@ -203,7 +203,7 @@ class IntegrityManager
     {
         $db = Database::getInstance();
         $stmt = $db->query(
-            "SELECT document_state_hash FROM document_logs WHERE document_id = :document_id ORDER BY id DESC LIMIT 1",
+            "SELECT hash, seal, document_state_hash FROM document_logs WHERE document_id = :document_id ORDER BY id DESC LIMIT 1",
             [':document_id' => $document['id']]
         );
         $lastLog = $stmt->fetch();
@@ -211,6 +211,11 @@ class IntegrityManager
         // If no logs exist yet, it's a new document, nothing to verify against.
         if (!$lastLog) {
             return true;
+        }
+
+        // A log appended or rewritten directly in the database cannot carry a valid seal
+        if (!self::verifySeal($lastLog)) {
+            return false;
         }
 
         $currentStateHash = self::calculateStateHash($document);
@@ -274,5 +279,131 @@ class IntegrityManager
             '', // No PIN
             $validStateHash
         );
+    }
+
+    /**
+     * Server-side HMAC key from APP_INTEGRITY_KEY. Empty means sealing is disabled (legacy mode).
+     */
+    public static function integrityKey(): string
+    {
+        static $key = null;
+        if ($key === null) {
+            $key = (string) ((require BASE_PATH . '/src/Config/config.php')['app']['integrity_key'] ?? '');
+        }
+        return $key;
+    }
+
+    /**
+     * Keyed seal over a log's block hash. Because the key never lives in the database, someone with
+     * DB write access can recompute SHA-256 hashes but cannot produce matching seals.
+     */
+    public static function sealFor(?string $hash): ?string
+    {
+        $key = self::integrityKey();
+        if ($key === '' || $hash === null || $hash === '') {
+            return null;
+        }
+        return hash_hmac('sha256', $hash, $key);
+    }
+
+    /**
+     * Check a log row's seal. Always passes when no key is configured.
+     */
+    public static function verifySeal(array $log): bool
+    {
+        if (self::integrityKey() === '') {
+            return true;
+        }
+        $expected = self::sealFor($log['hash'] ?? null);
+        return $expected !== null && !empty($log['seal']) && hash_equals($expected, $log['seal']);
+    }
+
+    /**
+     * Recompute a log's block hash from its stored fields (same formula as createLog).
+     */
+    public static function computeBlockHash(array $log, string $previousHash): string
+    {
+        $dataToHash = [
+            (int) $log['document_id'],
+            $log['user_id'] ? (int) $log['user_id'] : '',
+            $log['action'],
+            date('c', strtotime($log['created_at'])),
+            $previousHash,
+            $log['document_state_hash'],
+            $log['signature']
+        ];
+        return hash('sha256', json_encode($dataToHash, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Seal every unsealed log whose document chain still verifies. Documents with a broken chain are
+     * skipped (and returned) so tampered history is never sealed. Run once after APP_INTEGRITY_KEY is
+     * set (composer run seal), and after seeding.
+     *
+     * @return array{sealed:int, skipped_documents:array<int>}
+     */
+    public static function sealPendingLogs(): array
+    {
+        if (self::integrityKey() === '') {
+            throw new \Exception("APP_INTEGRITY_KEY is not set.");
+        }
+
+        $db = Database::getInstance();
+        $conn = $db->getConnection();
+        $sealed = 0;
+        $skipped = [];
+        $lastDocId = 0;
+
+        while (true) {
+            $docIds = $db->query(
+                "SELECT DISTINCT document_id FROM document_logs WHERE seal IS NULL AND document_id > :last ORDER BY document_id LIMIT 500",
+                [':last' => $lastDocId]
+            )->fetchAll(\PDO::FETCH_COLUMN);
+            if (empty($docIds)) {
+                break;
+            }
+            $docIds = array_map('intval', $docIds);
+            $lastDocId = end($docIds);
+
+            $placeholders = implode(',', array_fill(0, count($docIds), '?'));
+            $logs = $db->query(
+                "SELECT id, document_id, user_id, action, created_at, hash, seal, document_state_hash, signature
+                 FROM document_logs WHERE document_id IN ($placeholders) ORDER BY document_id, id",
+                $docIds
+            )->fetchAll();
+
+            $byDoc = [];
+            foreach ($logs as $log) {
+                $byDoc[$log['document_id']][] = $log;
+            }
+
+            $conn->beginTransaction();
+            $update = $conn->prepare("UPDATE document_logs SET seal = :seal WHERE id = :id");
+            foreach ($byDoc as $docId => $docLogs) {
+                $previousHash = 'genesis_hash';
+                $chainOk = true;
+                foreach ($docLogs as $log) {
+                    $sealOk = $log['seal'] === null || self::verifySeal($log);
+                    if (!$sealOk || $log['hash'] !== self::computeBlockHash($log, $previousHash)) {
+                        $chainOk = false;
+                        break;
+                    }
+                    $previousHash = $log['hash'];
+                }
+                if (!$chainOk) {
+                    $skipped[] = (int) $docId;
+                    continue;
+                }
+                foreach ($docLogs as $log) {
+                    if ($log['seal'] === null) {
+                        $update->execute([':seal' => self::sealFor($log['hash']), ':id' => $log['id']]);
+                        $sealed++;
+                    }
+                }
+            }
+            $conn->commit();
+        }
+
+        return ['sealed' => $sealed, 'skipped_documents' => $skipped];
     }
 }

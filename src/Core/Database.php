@@ -73,6 +73,16 @@ class Database
     }
 
     /**
+     * A second, independent connection. Writes on it are not rolled back with the main
+     * connection's transaction (used by RateLimiter to record failed PIN attempts).
+     */
+    public static function separateInstance(): self
+    {
+        static $separate = null;
+        return $separate ??= new self();
+    }
+
+    /**
      * Get the underlying PDO connection object.
      */
     public function getConnection(): PDO

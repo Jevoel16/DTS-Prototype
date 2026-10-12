@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Core\Database;
+use App\Core\IntegrityManager;
 
 class SystemHealthController
 {
@@ -160,6 +161,7 @@ class SystemHealthController
             'stored_hash' => $log['hash'],
             'recalculated_hash' => $recalculatedHash,
             'match' => $log['hash'] === $recalculatedHash,
+            'seal_valid' => IntegrityManager::verifySeal($log),
             'components' => [
                 'document_id' => $log['document_id'],
                 'user_id' => $log['user_id'],
@@ -177,7 +179,7 @@ class SystemHealthController
     public function runIntegrityCheck()
     {
         $db = Database::getInstance();
-        $id = uniqid(); // Simulating UUID
+        $id = bin2hex(random_bytes(16));
 
         $db->query("INSERT INTO integrity_checks (id, user_id, status, progress, created_at, updated_at) VALUES (:id, :user_id, 'queued', 0, NOW(), NOW())", [
             'id' => $id,
@@ -239,12 +241,14 @@ class SystemHealthController
         exit;
     }
 
-    public function rebuildChain()
+    public function rebuildChain($logId = null)
     {
-        $logId = $_POST['logId'] ?? null;
-        if (!$logId) {
-            header('Content-Type: application/json');
-            echo json_encode(['status' => 'error', 'message' => 'Missing logId']);
+        header('Content-Type: application/json');
+
+        // Re-hashing history is a privileged repair: require the admin's signing PIN and record it in the chain
+        $pin = \App\Core\SecurityHelper::resolvePin($_POST['pin'] ?? '');
+        if (!$logId || empty($pin)) {
+            echo json_encode(['status' => 'error', 'message' => 'Log ID and Security PIN are required.']);
             exit;
         }
 
@@ -252,59 +256,63 @@ class SystemHealthController
         $startLog = $db->query("SELECT * FROM document_logs WHERE id = :id", ['id' => $logId])->fetch();
 
         if (!$startLog) {
-            header('Content-Type: application/json');
-            echo json_encode(['status' => 'error', 'message' => "DocumentLog with ID {$logId} not found."]);
+            echo json_encode(['status' => 'error', 'message' => "DocumentLog with ID " . (int) $logId . " not found."]);
             exit;
         }
 
-        $documentId = $startLog['document_id'];
+        $documentId = (int) $startLog['document_id'];
+        $conn = $db->getConnection();
 
-        // Get logs to rebuild
-        $logsToRebuild = $db->query("SELECT * FROM document_logs WHERE document_id = :doc_id AND id >= :log_id ORDER BY id ASC", [
-            'doc_id' => $documentId,
-            'log_id' => $logId
-        ])->fetchAll();
+        try {
+            $conn->beginTransaction();
 
-        // Get last valid log
-        $lastValidLog = $db->query("SELECT hash FROM document_logs WHERE document_id = :doc_id AND id < :log_id ORDER BY id DESC LIMIT 1", [
-            'doc_id' => $documentId,
-            'log_id' => $logId
-        ])->fetch();
+            // Get logs to rebuild
+            $logsToRebuild = $db->query("SELECT * FROM document_logs WHERE document_id = :doc_id AND id >= :log_id ORDER BY id ASC", [
+                'doc_id' => $documentId,
+                'log_id' => $logId
+            ])->fetchAll();
 
-        $previousHash = $lastValidLog ? $lastValidLog['hash'] : 'genesis_hash';
+            // Get last valid log
+            $lastValidLog = $db->query("SELECT hash FROM document_logs WHERE document_id = :doc_id AND id < :log_id ORDER BY id DESC LIMIT 1", [
+                'doc_id' => $documentId,
+                'log_id' => $logId
+            ])->fetch();
 
-        foreach ($logsToRebuild as $log) {
-            $timestampForHashing = date('c', strtotime($log['created_at']));
-            
-            $dataToHash = [
-                (int) $log['document_id'],
-                $log['user_id'] ? (int) $log['user_id'] : '',
-                $log['action'],
-                $timestampForHashing,
-                $previousHash,
-                $log['document_state_hash'],
-                $log['signature']
-            ];
-            $newHash = hash('sha256', json_encode($dataToHash, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $previousHash = $lastValidLog ? $lastValidLog['hash'] : 'genesis_hash';
 
-            $db->query("UPDATE document_logs SET previous_hash = :prev, hash = :hash WHERE id = :id", [
-                'prev' => $previousHash,
-                'hash' => $newHash,
-                'id' => $log['id']
-            ]);
+            foreach ($logsToRebuild as $log) {
+                $newHash = IntegrityManager::computeBlockHash($log, $previousHash);
 
-            $previousHash = $newHash;
+                $db->query("UPDATE document_logs SET previous_hash = :prev, hash = :hash, seal = :seal WHERE id = :id", [
+                    'prev' => $previousHash,
+                    'hash' => $newHash,
+                    'seal' => IntegrityManager::sealFor($newHash),
+                    'id' => $log['id']
+                ]);
+
+                $previousHash = $newHash;
+            }
+
+            // Signed, chained admin entry (throws on a wrong PIN, which rolls the rebuild back)
+            $document = $db->query("SELECT * FROM documents WHERE id = :id", ['id' => $documentId])->fetch();
+            IntegrityManager::createLog(
+                $documentId,
+                (int) $_SESSION['user_id'],
+                'ADMIN: Hash chain rebuilt for Log ID: ' . (int) $logId,
+                'An administrator manually triggered a hash chain rebuild to resolve an integrity mismatch.',
+                $document,
+                $pin
+            );
+
+            $conn->commit();
+        } catch (\Throwable $e) {
+            if ($conn->inTransaction()) {
+                $conn->rollBack();
+            }
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            exit;
         }
 
-        // Add admin log
-        $db->query("INSERT INTO document_logs (document_id, user_id, action, remarks, created_at) VALUES (:doc_id, :uid, :action, :remarks, NOW())", [
-            'doc_id' => $documentId,
-            'uid' => $_SESSION['user_id'],
-            'action' => 'ADMIN: Hash chain rebuilt for Log ID: ' . $logId,
-            'remarks' => 'An administrator manually triggered a hash chain rebuild to resolve an integrity mismatch.'
-        ]);
-
-        header('Content-Type: application/json');
         echo json_encode(['status' => 'success', 'message' => 'Hash chain rebuilt']);
         exit;
     }
@@ -351,7 +359,7 @@ class SystemHealthController
 
         if (empty($pin)) {
             $_SESSION['error'] = "Security PIN is required.";
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? "/documents/{$tracking_code}"));
+            header("Location: " . safe_back("/documents/{$tracking_code}"));
             exit;
         }
 
@@ -368,7 +376,7 @@ class SystemHealthController
             }
         }
         
-        $referer = $_SERVER['HTTP_REFERER'] ?? "/documents/{$tracking_code}";
+        $referer = safe_back("/documents/{$tracking_code}");
         header("Location: $referer");
         exit;
     }
@@ -381,7 +389,7 @@ class SystemHealthController
 
         if (empty($pin)) {
             $_SESSION['error'] = "Security PIN is required.";
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? "/documents/{$tracking_code}"));
+            header("Location: " . safe_back("/documents/{$tracking_code}"));
             exit;
         }
 
@@ -398,7 +406,7 @@ class SystemHealthController
             }
         }
         
-        $referer = $_SERVER['HTTP_REFERER'] ?? "/documents/{$tracking_code}";
+        $referer = safe_back("/documents/{$tracking_code}");
         header("Location: $referer");
         exit;
     }
@@ -501,7 +509,7 @@ class SystemHealthController
         
         $_SESSION['success'] = "Your personalized cache has been cleared successfully.";
         
-        $referer = $_SERVER['HTTP_REFERER'] ?? '/';
+        $referer = safe_back('/');
         header("Location: " . $referer);
         exit;
     }

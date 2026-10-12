@@ -147,12 +147,16 @@ For full details, see [ARCHITECTURE.md](documentation/ARCHITECTURE.md).
 | Concern | Mechanism |
 | :--- | :--- |
 | **Tamper evidence** | Each log entry stores a SHA-256 hash of the document's state together with the previous entry's hash. Changing any past record breaks every hash after it. |
-| **Non-repudiation** | Each entry is signed with the acting user's Ed25519 private key and verified against that user's public key. |
-| **Key protection** | Private keys are encrypted at rest with a key derived from the user's signing PIN (Argon2id via libsodium). The PIN is set at first login and is never stored. |
-| **Authentication** | Passwords are hashed with PHP's `password_hash`. The session ID is regenerated at login, and session cookies are `HttpOnly` and `SameSite`. |
-| **Request forgery** | Every state-changing request requires a CSRF token. |
+| **Keyed seal** | Each entry's hash is also sealed with an HMAC using `APP_INTEGRITY_KEY`, which lives only in `.env`. Someone with database access alone can recompute SHA-256 hashes but cannot produce valid seals. |
+| **Non-repudiation** | Each entry is signed with the acting user's Ed25519 private key and verified against that user's public key. A blank or missing signature on any entry counts as tampering. |
+| **Key protection** | Private keys are encrypted at rest with authenticated encryption (`sodium_crypto_secretbox`) under a key derived from the user's signing PIN (Argon2id). The PIN is set at first login, is at least 8 characters, and is never stored. Older keys are re-encrypted automatically on their next use. |
+| **Brute force** | 5 failed sign-ins per account and IP, or 5 wrong PINs per user, lock for 15 minutes. Guest submissions, tracking lookups and PDF generation are rate-limited per IP. |
+| **Authentication** | Passwords are hashed with PHP's `password_hash`. The session ID is regenerated at login, and session cookies are `HttpOnly`, `SameSite=Strict`, and `Secure` in production. Sessions expire after 30 minutes idle or 8 hours total. Role and account status are re-checked on every request. |
+| **Authorization** | Staff can only open documents routed through their department. Report downloads are limited to the user who generated them. |
+| **Request forgery** | Every state-changing request requires a CSRF token. Redirects only go to same-site paths. |
+| **HTTP hardening** | NGINX sends HSTS, CSP, `X-Frame-Options`, `nosniff` and `Referrer-Policy`, and hides its version. |
 | **Concurrency** | Optimistic locking with row versions inside PDO transactions. |
-| **Incident response** | Automatic freeze on detected tampering, plus admin-initiated **Freeze All** and **Rebuild Chain**. |
+| **Incident response** | Automatic freeze on detected tampering, plus admin-initiated **Freeze All**, and a PIN-signed **Rebuild Chain**. A database restore also requires the admin's PIN. |
 
 A tampering demo is included: `composer run corrupt` modifies a document directly in the database so you can watch detection and the automatic freeze happen. See also the [Layman Guide to Hash Verification](documentation/HASH_VERIFICATION_LAYMAN_GUIDE.md) and [Quantum Safety](documentation/QUANTUM_SAFETY.md).
 
@@ -211,15 +215,30 @@ More screenshots are in [documentation/screenshots/](documentation/screenshots/)
    composer run dev
    ```
 
-5. **Open the application** at **https://localhost:8000** with NGINX (accept the self-signed certificate warning), or **http://localhost:8000** with the built-in server fallback. Sign in with one of the [default accounts](#default-test-accounts). Each user sets a signing PIN of at least 6 characters on first login.
+5. **Open the application** at **https://localhost:8000** with NGINX (accept the self-signed certificate warning), or **http://localhost:8000** with the built-in server fallback. Sign in with one of the [default accounts](#default-test-accounts). Each user sets a signing PIN of at least 8 characters on first login.
 
 ### Upgrading an existing installation
 
-Databases created before October 2026 need a one-time schema upgrade. It adds new indexes and drops unused Laravel tables, and it is safe to run more than once:
+Databases created before October 2026 need a one-time schema upgrade. It adds new indexes, the `rate_limits` table and the `document_logs.seal` column, and drops unused Laravel tables. It is safe to run more than once:
 
 ```bash
 composer run migrate
 ```
+
+Then set `APP_INTEGRITY_KEY` in `.env` and seal the existing logs once. Documents whose chain is already broken are listed instead of being sealed:
+
+```bash
+composer run seal
+```
+
+> **Important:** Once a key is set, unsealed logs count as tampered, so run `composer run seal` straight after setting it. Keep a copy of the key off the server.
+
+### Before going online
+
+- Set `APP_ENV=production`, `APP_URL`, `APP_INTEGRITY_KEY` and `BACKUP_PASSWORD` in `.env`, and keep the key and password somewhere off the server.
+- Use a dedicated MySQL account with only `SELECT, INSERT, UPDATE, DELETE` rights for the app (see `.env.example`), and keep MySQL bound to `127.0.0.1`.
+- Use a real domain with a trusted certificate (for example a named Cloudflare Tunnel or Let's Encrypt) instead of the self-signed one and the quick tunnel.
+- Run the worker under systemd or Supervisor (`composer run prod -- --no-worker`).
 
 ---
 
@@ -234,10 +253,14 @@ All settings are read from `.env` in the project root. The `DB_*` and `APP_DEBUG
 | `DB_DATABASE` | `deped_dts` | Database name (created by `seed:prod` if missing) |
 | `DB_USERNAME` | `root` | MySQL user |
 | `DB_PASSWORD` | *(empty)* | MySQL password |
-| `APP_DEBUG` | `false` | Show PHP errors in the browser. **Development only.** |
+| `APP_DEBUG` | `false` | Show PHP errors in the browser and write `storage/logs/navigation.log`. **Development only.** |
+| `APP_ENV` | `local` | `production` forces `Secure` session cookies and blocks the seeders, `corrupt.php` and `concurrency_test.php`. |
+| `APP_INTEGRITY_KEY` | *(empty)* | Secret that seals the hash chain. Generate it with `php -r "echo bin2hex(random_bytes(32));"`, then run `composer run seal`. |
+| `BACKUP_PASSWORD` | *(empty)* | Encrypts backup zips with AES-256. Backups can't be restored without it. |
+| `TRUSTED_PROXIES` | *(empty)* | Proxy IPs allowed to report the client IP. Not needed under the bundled NGINX config. |
 | `NGINX_PATH` | `C:\nginx` | *Windows only.* Path to `nginx.exe` or its folder (falls back to `PATH`) |
 | `OPENSSL_PATH` | *(auto)* | *Windows only.* Path to `openssl.exe` or its folder (falls back to `PATH`, then Git for Windows' bundled copy) |
-| `APP_URL` | `https://localhost:8000` | Base URL used by the `seed:dev` HTTP seeder. Use `http://localhost:8000` with the built-in server. |
+| `APP_URL` | `https://localhost:8000` | Public base URL printed on tracking forms, also used by the `seed:dev` HTTP seeder. Use `http://localhost:8000` with the built-in server. |
 
 For production sizing and InnoDB tuning, see [Hardware Specs & MySQL Tuning](documentation/HARDWARE_SPECS.md).
 
@@ -291,6 +314,7 @@ Generated files live in git-ignored folders and are rebuilt on each start, so a 
 | Command | Description |
 | :--- | :--- |
 | `php scripts/generate-keys.php` | Generates missing Ed25519 keypairs for users. |
+| `composer run seal` | Seals unsealed hash-chain logs with `APP_INTEGRITY_KEY` ([scripts/seal-logs.php](scripts/seal-logs.php)). The seeders run it automatically. |
 | `composer run corrupt` | Tampers with a document ([scripts/corrupt.php](scripts/corrupt.php)) to demonstrate tamper detection and the automatic freeze. |
 | `php scripts/concurrency_test.php` | Simulates concurrent updates to one document to exercise optimistic locking. |
 

@@ -3,6 +3,7 @@
 // Front Controller environment setup so classes load correctly
 define('BASE_PATH', dirname(__DIR__));
 require BASE_PATH . '/vendor/autoload.php';
+refuse_in_production();
 
 use App\Core\Database;
 

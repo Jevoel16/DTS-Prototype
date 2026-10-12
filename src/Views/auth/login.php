@@ -11,17 +11,7 @@
 
     <!-- Local Tailwind CSS -->
     <link href="/css/tailwind.css" rel="stylesheet">
-    <script>
-        (function() {
-            const theme = localStorage.getItem('theme');
-            const isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        })();
-    </script>
+    <script src="/js/theme-init.js"></script>
 </head>
 <body class="bg-gray-100 dark:bg-darkBg font-sans antialiased text-gray-900 dark:text-gray-100">
 
@@ -82,43 +72,7 @@
         </div>
     </div>
 
-    <script>
-        var themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-        var themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
-
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            themeToggleLightIcon.classList.remove('hidden');
-        } else {
-            themeToggleDarkIcon.classList.remove('hidden');
-        }
-
-        var themeToggleBtn = document.getElementById('theme-toggle');
-
-        if (themeToggleBtn) {
-            themeToggleBtn.addEventListener('click', function() {
-                themeToggleDarkIcon.classList.toggle('hidden');
-                themeToggleLightIcon.classList.toggle('hidden');
-
-                if (localStorage.getItem('theme')) {
-                    if (localStorage.getItem('theme') === 'light') {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('theme', 'dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('theme', 'light');
-                    }
-                } else {
-                    if (document.documentElement.classList.contains('dark')) {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('theme', 'light');
-                    } else {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('theme', 'dark');
-                    }
-                }
-            });
-        }
-    </script>
+    <script src="/js/common.js"></script>
     <?php clear_form_flash(); ?>
 </body>
 </html>

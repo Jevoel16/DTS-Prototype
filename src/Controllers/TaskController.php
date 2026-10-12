@@ -20,7 +20,7 @@ class TaskController
 
         if (empty($pin)) {
             $_SESSION['error'] = "Security PIN is required.";
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? '/tasks'));
+            header("Location: " . safe_back('/tasks'));
             exit;
         }
 

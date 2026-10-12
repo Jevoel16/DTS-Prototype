@@ -53,7 +53,7 @@ class UserController
             'name' => 'required',
             'email' => 'required',
             'password' => 'required|min:8',
-            'role' => 'required',
+            'role' => 'required|in:admin,officer,staff',
             'password_confirmation' => 'required'
         ]);
 
@@ -122,7 +122,7 @@ class UserController
         [$errors, $validated] = Validator::validate($_POST, [
             'name' => 'required',
             'email' => 'required',
-            'role' => 'required',
+            'role' => 'required|in:admin,officer,staff',
             'password' => '',
             'password_confirmation' => ''
         ]);
@@ -141,6 +141,13 @@ class UserController
 
         if (!empty($password) && $password !== $password_confirmation) {
             $_SESSION['error'] = 'Passwords do not match.';
+            header("Location: /users/{$id}/edit");
+            exit;
+        }
+
+        // Same minimum as account creation
+        if (!empty($password) && strlen($password) < 8) {
+            $_SESSION['error'] = 'Password must be at least 8 characters.';
             header("Location: /users/{$id}/edit");
             exit;
         }

@@ -10,7 +10,7 @@ class CreateBackupJob
         set_time_limit(1200);
 
         $backupDir = BASE_PATH . '/storage/app/backups';
-        if (!is_dir($backupDir)) mkdir($backupDir, 0777, true);
+        if (!is_dir($backupDir)) mkdir($backupDir, 0770, true);
 
         $db = \App\Core\Database::getInstance();
         $docCount = $db->query("SELECT COUNT(*) as count FROM documents")->fetch()['count'] ?? 0;
@@ -26,10 +26,16 @@ class CreateBackupJob
             throw new \Exception("Database backup failed: " . $e->getMessage());
         }
 
-        // Zip it
+        // Zip it, AES-256 encrypted when BACKUP_PASSWORD is set (dumps hold password hashes, keys and guest data)
+        $password = (require BASE_PATH . '/src/Config/config.php')['app']['backup_password'];
         $zip = new \ZipArchive();
         if ($zip->open($zipPath, \ZipArchive::CREATE) === TRUE) {
             $zip->addFile($filePath, $filename);
+            if ($password !== '') {
+                $zip->setEncryptionName($filename, \ZipArchive::EM_AES_256, $password);
+            } else {
+                error_log("BACKUP_PASSWORD is not set: backup {$filename}.zip is stored unencrypted.");
+            }
             $zip->close();
         }
 

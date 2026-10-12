@@ -27,10 +27,13 @@ class DocumentController
             exit;
         }
 
+        $this->authorizeView($document);
+
         if (!empty($_SERVER['HTTP_REFERER'])) {
             $refererPath = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_PATH) ?? '';
             if (!empty($refererPath) && !str_contains($refererPath, '/hash-chain') && !str_contains($refererPath, '/documents/')) {
-                $_SESSION['doc_return_url'] = $_SERVER['HTTP_REFERER'];
+                // Only same-site paths: the value is rendered as the page's Back link
+                $_SESSION['doc_return_url'] = safe_back('/dashboard');
             }
         }
 
@@ -54,6 +57,8 @@ class DocumentController
             echo "Document not found.";
             exit;
         }
+
+        $this->authorizeView($document);
 
         $logs = $document['logs'];
 
@@ -178,6 +183,21 @@ class DocumentController
             exit;
         }
 
+        // Every step must be an existing department name; staff authorization matches on these names
+        $validNames = Database::getInstance()->query("SELECT name FROM departments")->fetchAll(\PDO::FETCH_COLUMN);
+        $isValidRoute = array_is_list($routeNames) && count($routeNames) <= 30;
+        foreach ($isValidRoute ? $routeNames : [] as $name) {
+            if (!is_string($name) || !in_array($name, $validNames, true)) {
+                $isValidRoute = false;
+                break;
+            }
+        }
+        if (!$isValidRoute) {
+            $_SESSION['error'] = "The route contains an unknown department. Please rebuild it from the list.";
+            header("Location: /documents/{$id}/manage");
+            exit;
+        }
+
         try {
             $workflow = new \App\Services\DocumentWorkflowService();
             $officer = \App\Models\User::findById($_SESSION['user_id']);
@@ -208,13 +228,13 @@ class DocumentController
 
         if (empty($trackingCode)) {
             $_SESSION['error'] = "Tracking code is required.";
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? '/'));
+            header("Location: " . safe_back('/'));
             exit;
         }
 
         if (empty($pin)) {
             $_SESSION['error'] = "Security PIN is required.";
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? '/'));
+            header("Location: " . safe_back('/'));
             exit;
         }
 
@@ -236,7 +256,7 @@ class DocumentController
             } else {
                 $_SESSION['error'] = $e->getMessage();
             }
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? '/'));
+            header("Location: " . safe_back('/'));
         }
         exit;
     }
@@ -245,19 +265,19 @@ class DocumentController
     {
         $db = \App\Core\Database::getInstance();
         $documentId = $_POST['document_id'] ?? null;
-        $reason = $_POST['reason'] ?? '';
+        $reason = mb_substr(trim((string) ($_POST['reason'] ?? '')), 0, 1000);
         $submittedPin = $_POST['pin'] ?? '';
         $pin = \App\Core\SecurityHelper::resolvePin($submittedPin);
         
         if (!$documentId || !$reason) {
             $_SESSION['error'] = 'Document ID and decline reason are required.';
-            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/intake'));
+            header('Location: ' . safe_back('/intake'));
             exit;
         }
 
         if (empty($pin)) {
             $_SESSION['error'] = "Security PIN is required.";
-            header("Location: " . ($_SERVER['HTTP_REFERER'] ?? '/'));
+            header("Location: " . safe_back('/'));
             exit;
         }
 
@@ -278,7 +298,7 @@ class DocumentController
             }
         }
         
-        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/intake'));
+        header('Location: ' . safe_back('/intake'));
         exit;
     }
 
@@ -289,6 +309,14 @@ class DocumentController
      */
     public function printTrackingForm($tracking_code)
     {
+        // Logged-in users, or the guest who submitted this document in the current session
+        $submittedCodes = $_SESSION['submitted_codes'] ?? [];
+        if (!isset($_SESSION['user_id']) && !in_array($tracking_code, $submittedCodes, true)) {
+            http_response_code(403);
+            echo "403 Forbidden: Please sign in to print this tracking form.";
+            exit;
+        }
+
         $db = Database::getInstance();
         
         $stmt = $db->query("SELECT d.*, p.name as purpose_name 
@@ -323,7 +351,8 @@ class DocumentController
         // Generate PDF
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
-        $options->set('isRemoteEnabled', true);
+        // All images are embedded as base64, so remote fetching stays off (prevents SSRF)
+        $options->set('isRemoteEnabled', false);
         
         $dompdf = new Dompdf($options);
         $dompdf->loadHtml($html);
@@ -331,5 +360,18 @@ class DocumentController
         $dompdf->render();
 
         $dompdf->stream('document-tracking-form-'.$document['tracking_code'].'.pdf', ["Attachment" => false]);
+    }
+
+    /**
+     * Staff may only view documents routed through their department (DocumentPolicy::view).
+     */
+    private function authorizeView(array $document): void
+    {
+        $user = \App\Models\User::findById((int) $_SESSION['user_id']);
+        if (!$user || !(new \App\Policies\DocumentPolicy())->view($user, $document)) {
+            http_response_code(403);
+            echo "403 Forbidden: You do not have permission to view this document.";
+            exit;
+        }
     }
 }

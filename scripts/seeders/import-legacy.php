@@ -2,6 +2,7 @@
 
 define('BASE_PATH', dirname(dirname(__DIR__)));
 require BASE_PATH . '/vendor/autoload.php';
+refuse_in_production();
 
 use App\Core\Database;
 use App\Core\IntegrityManager;
@@ -570,4 +571,7 @@ $conn->exec('SET FOREIGN_KEY_CHECKS = 1');
 
 // Rebuild dashboard metrics for the imported history
 passthru('php ' . escapeshellarg(BASE_PATH . '/scripts/backfill-metrics.php') . ' --full');
+
+// Seal the new hash chains with APP_INTEGRITY_KEY (no-op when the key is not set)
+passthru('php ' . escapeshellarg(BASE_PATH . '/scripts/seal-logs.php'));
 echo "🎉 Done! Seeded legacy data successfully.\n";

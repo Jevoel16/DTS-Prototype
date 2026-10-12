@@ -17,7 +17,7 @@ if (file_exists($envPath)) {
 }
 
 // Real environment variables (systemd, CI, one-off CLI runs) override .env
-foreach (['DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'APP_DEBUG'] as $key) {
+foreach (['DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'APP_DEBUG', 'APP_ENV', 'APP_URL', 'APP_INTEGRITY_KEY', 'TRUSTED_PROXIES', 'BACKUP_PASSWORD'] as $key) {
     $value = getenv($key);
     if ($value !== false) {
         $env[$key] = $value;
@@ -28,6 +28,16 @@ return [
     'app' => [
         // Show PHP errors in the browser only when APP_DEBUG=true
         'debug' => filter_var($env['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOL),
+        // 'production' forces Secure cookies and disables dev-only scripts
+        'env' => $env['APP_ENV'] ?? 'local',
+        // Public base URL (e.g. https://dts.example.gov.ph); used in printed tracking links
+        'url' => $env['APP_URL'] ?? '',
+        // Server-side secret that seals the document hash chain (HMAC). Never store it in the database.
+        'integrity_key' => $env['APP_INTEGRITY_KEY'] ?? '',
+        // Comma-separated proxy IPs allowed to supply the client IP (CF-Connecting-IP / X-Forwarded-For)
+        'trusted_proxies' => array_filter(array_map('trim', explode(',', $env['TRUSTED_PROXIES'] ?? ''))),
+        // Encrypts backup zips (AES-256). Store it outside the server too: without it backups cannot be restored
+        'backup_password' => $env['BACKUP_PASSWORD'] ?? '',
     ],
     'database' => [
         'host' => $env['DB_HOST'],

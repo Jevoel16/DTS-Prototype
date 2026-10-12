@@ -148,7 +148,7 @@ function ensureSslCert(string $lanIp): void {
     }
 
     if (isWindows() && !is_dir(dirname($certPath))) {
-        mkdir(dirname($certPath), 0777, true);
+        mkdir(dirname($certPath), 0770, true);
     }
 
     echo "🔐 Generating SSL cert with SANs for localhost + $lanIp...\n";
@@ -248,7 +248,7 @@ function startQueueWorker() {
     $consolePath = projectRoot() . DIRECTORY_SEPARATOR . 'console.php';
     $logDir = projectRoot() . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'logs';
     if (!is_dir($logDir)) {
-        mkdir($logDir, 0777, true);
+        mkdir($logDir, 0770, true);
     }
     $logFile = $logDir . DIRECTORY_SEPARATOR . 'worker.log';
 
@@ -310,7 +310,7 @@ function installNginxConfigWindows(string $projectRoot, string $nginxExe, string
     $prefix = $projectRoot . '\\storage\\nginx';
     foreach (['', '\\logs', '\\temp', '\\conf'] as $dir) {
         if (!is_dir($prefix . $dir)) {
-            mkdir($prefix . $dir, 0777, true);
+            mkdir($prefix . $dir, 0770, true);
         }
     }
 

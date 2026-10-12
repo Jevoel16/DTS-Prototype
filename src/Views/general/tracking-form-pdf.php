@@ -110,10 +110,13 @@
         ];
         $rowCount = count($details);
         
-        // Construct the tracking URL based on the current host.
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
-        $host = $_SERVER['HTTP_HOST'];
-        $trackingUrl = $protocol . $host . '/track?codes=' . urlencode($document['tracking_code']);
+        // Use the configured APP_URL; fall back to the request host only when it is not set (LAN dev)
+        $appUrl = (require BASE_PATH . '/src/Config/config.php')['app']['url'];
+        if ($appUrl === '') {
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+            $appUrl = $protocol . preg_replace('/[^A-Za-z0-9.\-:\[\]]/', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
+        }
+        $trackingUrl = rtrim($appUrl, '/') . '/track?codes=' . urlencode($document['tracking_code']);
         
         // Base64 encode the logo for reliable DomPDF rendering
         // 480px copy of "DepEd Seal.png": shown at 120px, so the full 1280px original only slows DomPDF

@@ -8,7 +8,7 @@
             
             <div class="mb-5">
                 <label for="guest_name" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Your Full Name</label>
-                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('guest_name') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_name" name="guest_name" value="<?= old('guest_name') ?>" required>
+                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('guest_name') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_name" name="guest_name" maxlength="120" value="<?= old('guest_name') ?>" required>
                 <?php if (has_error('guest_name')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('guest_name') ?></p><?php endif; ?>
             </div>
 
@@ -58,7 +58,7 @@
 
             <div class="mb-5">
                 <label for="title" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Document Title</label>
-                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('title') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="title" name="title" value="<?= old('title') ?>" required placeholder="N/A if inapplicable.">
+                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('title') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="title" name="title" maxlength="140" value="<?= old('title') ?>" required placeholder="N/A if inapplicable.">
                 <?php if (has_error('title')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('title') ?></p><?php endif; ?>
             </div>
 
@@ -95,7 +95,7 @@
                 <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded transition duration-200 shadow-md">
                     Submit Request
                 </button>
-                <button type="button" onclick="document.getElementById('track-modal').classList.remove('hidden')" class="w-full bg-gray-500 hover:bg-accent-2 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-md">
+                <button type="button" data-show-modal="track-modal" class="w-full bg-gray-500 hover:bg-accent-2 text-white font-bold py-3 px-4 rounded transition duration-200 shadow-md">
                     Track a Document
                 </button>
             </div>
@@ -124,7 +124,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="document.getElementById('track-modal').classList.add('hidden')" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-accent-2 text-gray-800 dark:text-gray-200 font-medium py-2 px-4 rounded">
+                    <button type="button" data-hide-modal="track-modal" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-accent-2 text-gray-800 dark:text-gray-200 font-medium py-2 px-4 rounded">
                         Close
                     </button>
                     <button type="submit" class="bg-primary hover:bg-primary-hover text-white font-medium py-2 px-4 rounded">
@@ -150,162 +150,5 @@
 </div>
 
 <script src="/js/html5-qrcode.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const purposeSelect = document.getElementById('purpose-select');
-        const otherPurposeInput = document.getElementById('other-purpose-input');
-        const otherPurposeTextField = document.getElementById('other_purpose_text');
-        const requirementsSection = document.getElementById('requirements-section');
-        const requirementsList = document.getElementById('requirements-list');
-
-        // Dynamically reveal or hide the "Requirements" section based on the user's selected purpose dropdown.
-        function updatePurposeFields() {
-            const selectedOptionValue = purposeSelect.value;
-            const selectedOption = purposeSelect.options[purposeSelect.selectedIndex];
-
-            if (selectedOptionValue === '0') {
-                otherPurposeInput.classList.remove('hidden');
-                otherPurposeTextField.setAttribute('required', 'required');
-                requirementsSection.classList.add('hidden');
-                requirementsList.innerHTML = '';
-            } else if (selectedOptionValue) {
-                otherPurposeInput.classList.add('hidden');
-                otherPurposeTextField.removeAttribute('required');
-                otherPurposeTextField.value = '';
-
-                const requirements = selectedOption.dataset.requirements ? JSON.parse(selectedOption.dataset.requirements) : [];
-                requirementsList.innerHTML = '';
-
-                if (requirements.length > 0) {
-                    requirements.forEach(req => {
-                        const li = document.createElement('li');
-                        li.textContent = req;
-                        li.className = 'bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-md text-sm';
-                        requirementsList.appendChild(li);
-                    });
-                    requirementsSection.classList.remove('hidden');
-                } else {
-                    requirementsSection.classList.add('hidden');
-                }
-            } else {
-                otherPurposeInput.classList.add('hidden');
-                requirementsSection.classList.add('hidden');
-            }
-        }
-
-        if (purposeSelect) {
-            updatePurposeFields();
-            purposeSelect.addEventListener('change', updatePurposeFields);
-        }
-
-        // Numeric-only restriction for Phone Number
-        const phoneInput = document.getElementById('guest_phone');
-        if (phoneInput) {
-            phoneInput.addEventListener('input', function () {
-                this.value = this.value.replace(/[^0-9]/g, '');
-            });
-        }
-
-        // Track Logic
-        const trackForm = document.getElementById('track-document-form');
-        const trackingCodeInput = document.getElementById('tracking_code_input');
-        const trackErrorMessage = document.getElementById('track-error-message');
-
-        function displayError(message) {
-            if(trackErrorMessage) {
-                trackErrorMessage.textContent = message;
-                trackErrorMessage.classList.remove('hidden');
-            }
-        }
-
-        function clearError() {
-            if(trackErrorMessage) {
-                trackErrorMessage.classList.add('hidden');
-                trackErrorMessage.textContent = '';
-            }
-        }
-
-        if(trackingCodeInput) {
-            trackingCodeInput.addEventListener('input', clearError);
-        }
-
-        function trackAndRedirect(trackingCode) {
-            clearError();
-            if (!trackingCode) {
-                displayError('Please enter a tracking code.');
-                return;
-            }
-            window.location.href = `/track?codes=${encodeURIComponent(trackingCode)}`;
-        }
-
-        if (trackForm) {
-            trackForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const trackingCode = trackingCodeInput.value.trim();
-                trackAndRedirect(trackingCode);
-            });
-        }
-
-        // QR Scanner Logic
-        const scanQrButton = document.getElementById('scan-qr-button');
-        const qrScannerModal = document.getElementById('qr-scanner-modal');
-        const closeQrModal = document.getElementById('close-qr-modal');
-        const trackModal = document.getElementById('track-modal');
-        let html5QrCode = null;
-
-        function onScanSuccess(decodedText, decodedResult) {
-            stopQrCodeScanner();
-            trackAndRedirect(decodedText);
-        }
-
-        function onScanError(errorMessage) {
-            // Ignore minor errors while scanning
-        }
-
-        function startQrCodeScanner() {
-            trackModal.classList.add('hidden');
-            qrScannerModal.style.display = 'block';
-
-            if (!html5QrCode && window.Html5Qrcode) {
-                html5QrCode = new window.Html5Qrcode("qr-reader");
-                html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    onScanSuccess,
-                    onScanError
-                ).catch(err => {
-                    console.error("Could not start QR scanner.", err);
-                    alert("Could not start QR scanner. Please ensure you are using HTTPS and grant camera permissions.");
-                    stopQrCodeScanner();
-                });
-            } else if (!window.Html5Qrcode) {
-                alert("QR Scanner library not loaded.");
-            }
-        }
-
-        function stopQrCodeScanner() {
-            if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().catch(err => {
-                    console.error("Error stopping the QR scanner.", err);
-                });
-            }
-            if (qrScannerModal) {
-                qrScannerModal.style.display = 'none';
-            }
-        }
-        
-        if (scanQrButton) {
-            scanQrButton.addEventListener('click', startQrCodeScanner);
-        }
-        if (closeQrModal) {
-            closeQrModal.addEventListener('click', stopQrCodeScanner);
-        }
-
-        window.addEventListener('click', function(event) {
-            if (event.target == qrScannerModal) {
-                stopQrCodeScanner();
-            }
-        });
-    });
-</script>
+<script src="/js/guest-welcome.js"></script>
 <?php clear_form_flash(); ?>

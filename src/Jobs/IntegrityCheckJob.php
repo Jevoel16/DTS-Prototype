@@ -103,8 +103,21 @@ class IntegrityCheckJob
                             ];
                             $recalculatedHash = hash('sha256', json_encode($dataToHash, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
-                            if ($recalculatedHash !== $log['hash']) {
+                            // A recomputed hash proves nothing on its own (SHA-256 needs no secret); the seal must also match
+                            if ($recalculatedHash !== $log['hash'] || !\App\Core\IntegrityManager::verifySeal($log)) {
                                 $invalidLogsCount++;
+                                if (!isset($mismatchedIdsSet[$log['id']])) {
+                                    $mismatchedIdsSet[$log['id']] = true;
+                                    $mismatchedIdsCount++;
+                                    if ($mismatchedIdsCount <= self::MAX_TRACKED_MISMATCHES) {
+                                        $mismatchedIdsList[] = $log['id'];
+                                    }
+                                }
+                            }
+
+                            // Every log is signed when written, so a blank signature means it was stripped
+                            if (!$log['signature'] || strlen($log['signature']) <= 10) {
+                                $invalidSignaturesCount++;
                                 if (!isset($mismatchedIdsSet[$log['id']])) {
                                     $mismatchedIdsSet[$log['id']] = true;
                                     $mismatchedIdsCount++;
@@ -226,7 +239,8 @@ class IntegrityCheckJob
             $verifiedPercentage = ($totalLogs > 0) ? (($totalLogs - $mismatchedIdsCount) / $totalLogs) * 100 : 100;
 
             $results = [
-                'verified_percentage' => round($verifiedPercentage, 2),
+                // Round down so a single bad log among thousands never displays as a (green) 100%
+                'verified_percentage' => floor($verifiedPercentage * 100) / 100,
                 'last_checked' => date('Y-m-d H:i:s'),
                 'total_logs' => $totalLogs,
                 'invalid_logs' => $invalidLogsCount,
@@ -238,7 +252,7 @@ class IntegrityCheckJob
             ];
 
             if (!is_dir(BASE_PATH . '/cache')) {
-                mkdir(BASE_PATH . '/cache', 0777, true);
+                mkdir(BASE_PATH . '/cache', 0770, true);
             }
             file_put_contents(BASE_PATH . '/cache/integrity-check-result.json', json_encode($results));
 

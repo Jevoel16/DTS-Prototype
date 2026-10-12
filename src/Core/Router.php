@@ -126,7 +126,7 @@ class Router
                     }
 
                     $_SESSION['error'] = "An unexpected error occurred. Please try again or contact support.";
-                    header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/'));
+                    header('Location: ' . safe_back('/'));
                     exit;
                 }
             }

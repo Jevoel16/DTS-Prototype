@@ -3,10 +3,14 @@
 namespace App\Controllers;
 
 use App\Core\Database;
+use App\Core\RateLimiter;
 use App\Core\Validator;
 
 class AuthController
 {
+    private const MAX_FAILED_LOGINS = 5;
+    private const LOGIN_LOCKOUT_SECONDS = 900;
+
     /**
      * Show the login form.
      */
@@ -43,18 +47,32 @@ class AuthController
         $email = $validated['email'];
         $password = $validated['password'];
 
+        // Lock an account+IP pair after repeated failures to stop password guessing
+        $throttleKey = 'login:' . strtolower($email) . '|' . RateLimiter::clientIp();
+        if (RateLimiter::tooMany($throttleKey, self::MAX_FAILED_LOGINS)) {
+            $minutes = (int) ceil(RateLimiter::availableIn($throttleKey) / 60);
+            $_SESSION['error'] = "Too many failed sign-in attempts. Please try again in {$minutes} minute(s).";
+            $_SESSION['old'] = ['email' => $email];
+            header("Location: /login");
+            exit;
+        }
+
         $db = Database::getInstance();
         $stmt = $db->query("SELECT * FROM users WHERE email = :email LIMIT 1", [':email' => $email]);
         $user = $stmt->fetch();
 
         // Verify the user exists and the password is correct
         if ($user && password_verify($password, $user['password'])) {
+            RateLimiter::clear($throttleKey);
+
             // Success! Store user details in session
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['department_id'] = $user['department_id'];
-            $_SESSION['private_key'] = $user['private_key'];
+            // Used by AuthMiddleware for the idle and absolute session timeouts
+            $_SESSION['login_at'] = time();
+            $_SESSION['last_activity'] = time();
 
             if ($user['department_id']) {
                 $deptStmt = $db->query("SELECT name FROM departments WHERE id = :id", [':id' => $user['department_id']]);
@@ -70,6 +88,7 @@ class AuthController
             $this->redirectBasedOnRole($user['role']);
         } else {
             // Failed login
+            RateLimiter::hit($throttleKey, self::MAX_FAILED_LOGINS, self::LOGIN_LOCKOUT_SECONDS);
             $_SESSION['error'] = "These credentials do not match our records.";
             $_SESSION['field_errors'] = [
                 'email' => 'Invalid username or password.',

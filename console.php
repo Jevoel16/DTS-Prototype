@@ -99,6 +99,16 @@ function runScheduledTasks(int &$lastSampleTime, int &$lastBackfillTime, int &$l
             echo "⏰ [Worker Scheduler] Database cache GC failed: " . $e->getMessage() . "\n";
         }
 
+        // Rate-limit windows that have already reset
+        try {
+            $deleted = \App\Core\Database::getInstance()
+                ->query("DELETE FROM rate_limits WHERE reset_at < UNIX_TIMESTAMP()")
+                ->rowCount();
+            echo "⏰ [Worker Scheduler] Rate limit GC: removed {$deleted} expired row(s).\n";
+        } catch (\Throwable $e) {
+            echo "⏰ [Worker Scheduler] Rate limit GC failed: " . $e->getMessage() . "\n";
+        }
+
         // Rotate navigation.log when it exceeds 50 MB to prevent unbounded growth
         $navLog = BASE_PATH . '/storage/logs/navigation.log';
         if (file_exists($navLog) && filesize($navLog) > 50 * 1024 * 1024) {

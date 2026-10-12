@@ -40,17 +40,7 @@ if (isset($_SESSION['user_id'])) {
 
     <!-- Local Tailwind CSS -->
     <link href="/css/tailwind.css" rel="stylesheet">
-    <script>
-        (function() {
-            const theme = localStorage.getItem('theme');
-            const isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            if (isDark) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        })();
-    </script>
+    <script src="/js/theme-init.js"></script>
     <style>
         @keyframes slideInRight {
             from { transform: translateX(100%); opacity: 0; }
@@ -63,35 +53,7 @@ if (isset($_SESSION['user_id'])) {
     
     <!-- Chart.js is loaded once here (not per page) so PJAX page swaps reuse it -->
     <script src="/js/chart.min.js"></script>
-    <script>
-        // Theme Chart.js text and grid lines to match light/dark mode, and re-theme live charts on toggle
-        (function () {
-            function applyChartTheme() {
-                var isDark = document.documentElement.classList.contains('dark');
-                var text = isDark ? '#d1d5db' : '#4b5563';
-                var grid = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-                // Defaults cover charts created later
-                Chart.defaults.color = text;
-                Chart.defaults.borderColor = grid;
-                // Existing charts have their colors baked into their options, so set them explicitly
-                Object.values(Chart.instances).forEach(function (chart) {
-                    var o = chart.options;
-                    Object.values(o.scales || {}).forEach(function (s) {
-                        if (s.ticks) s.ticks.color = text;
-                        if (s.title) s.title.color = text;
-                        if (s.pointLabels) s.pointLabels.color = text;
-                        if (s.grid) s.grid.color = grid;
-                        if (s.angleLines) s.angleLines.color = grid;
-                    });
-                    if (o.plugins && o.plugins.legend && o.plugins.legend.labels) o.plugins.legend.labels.color = text;
-                    if (o.plugins && o.plugins.title) o.plugins.title.color = text;
-                    chart.update('none');
-                });
-            }
-            applyChartTheme();
-            new MutationObserver(applyChartTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-        })();
-    </script>
+    <script src="/js/chart-theme.js"></script>
 </head>
 <body class="font-sans antialiased bg-gray-100 dark:bg-darkBg text-gray-900 dark:text-gray-100">
 
@@ -277,82 +239,8 @@ if (isset($_SESSION['user_id'])) {
         </main>
     </div>
 
-    <script>
-        var themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-        var themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
-
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            themeToggleLightIcon.classList.remove('hidden');
-        } else {
-            themeToggleDarkIcon.classList.remove('hidden');
-        }
-
-        var themeToggleBtn = document.getElementById('theme-toggle');
-
-        if (themeToggleBtn) {
-            themeToggleBtn.addEventListener('click', function() {
-                themeToggleDarkIcon.classList.toggle('hidden');
-                themeToggleLightIcon.classList.toggle('hidden');
-
-                if (localStorage.getItem('theme')) {
-                    if (localStorage.getItem('theme') === 'light') {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('theme', 'dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('theme', 'light');
-                    }
-                } else {
-                    if (document.documentElement.classList.contains('dark')) {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('theme', 'light');
-                    } else {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('theme', 'dark');
-                    }
-                }
-            });
-        }
-        var mobileMenuBtn = document.getElementById('mobile-menu-button');
-        var mobileMenu = document.getElementById('mobile-menu');
-
-        window.closeMobileMenu = function() {
-            if (!mobileMenu) return;
-            mobileMenu.classList.add('hidden');
-            mobileMenuBtn.setAttribute('aria-expanded', 'false');
-            document.getElementById('mobile-menu-open-icon').classList.remove('hidden');
-            document.getElementById('mobile-menu-close-icon').classList.add('hidden');
-        };
-
-        if (mobileMenuBtn && mobileMenu) {
-            mobileMenuBtn.addEventListener('click', function() {
-                var isOpen = !mobileMenu.classList.toggle('hidden');
-                mobileMenuBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                document.getElementById('mobile-menu-open-icon').classList.toggle('hidden', isOpen);
-                document.getElementById('mobile-menu-close-icon').classList.toggle('hidden', !isOpen);
-            });
-        }
-
-        var userMenuBtn = document.getElementById('user-menu-button');
-        var userDropdownMenu = document.getElementById('user-dropdown-menu');
-
-        if (userMenuBtn && userDropdownMenu) {
-            userMenuBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                userDropdownMenu.classList.toggle('hidden');
-            });
-
-            document.addEventListener('click', function(e) {
-                if (!userMenuBtn.contains(e.target) && !userDropdownMenu.contains(e.target)) {
-                    userDropdownMenu.classList.add('hidden');
-                }
-            });
-        }
-    </script>
     <?php if (isset($_SESSION['console_error'])): ?>
-        <script>
-            console.error(<?= json_encode($_SESSION['console_error']) ?>);
-        </script>
+        <script type="application/json" id="dts-console-error"><?= json_encode($_SESSION['console_error'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
         <?php unset($_SESSION['console_error']); ?>
     <?php endif; ?>
 
@@ -373,12 +261,12 @@ if (isset($_SESSION['user_id'])) {
             <!-- Hidden submit to safely capture Enter key -->
             <button type="submit" class="hidden" aria-hidden="true"></button>
             <div class="mb-4">
-                <label for="pin" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Create a 6-digit Security PIN</label>
-                <input type="password" name="pin" id="pin" minlength="6" required class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm p-2 border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-accent-1 focus:border-accent-1">
+                <label for="pin" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Create a Security PIN (at least 8 characters)</label>
+                <input type="password" name="pin" id="pin" minlength="8" required class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm p-2 border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-accent-1 focus:border-accent-1">
             </div>
             <div class="mb-4">
                 <label for="pin_confirm" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirm Security PIN</label>
-                <input type="password" name="pin_confirm" id="pin_confirm" minlength="6" required class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm p-2 border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-accent-1 focus:border-accent-1">
+                <input type="password" name="pin_confirm" id="pin_confirm" minlength="8" required class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm p-2 border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-accent-1 focus:border-accent-1">
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">This PIN will be used to encrypt your private key. You will need it every time you approve or process a document.</p>
             </div>
         </form>
@@ -398,19 +286,6 @@ if (isset($_SESSION['user_id'])) {
     
     require BASE_PATH . '/src/Views/components/modal.php';
     ?>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const secModal = document.getElementById("security-key-modal");
-            if (secModal) {
-                secModal.classList.remove("hidden");
-                document.body.style.overflow = "hidden";
-                
-                // Prevent closing on backdrop click by removing the triggering class
-                const backdrop = secModal.querySelector(".close-modal-backdrop");
-                if (backdrop) backdrop.classList.remove("close-modal-backdrop");
-            }
-        });
-    </script>
     <?php endif; ?>
 
     <!-- Global Confirmation Modal -->
@@ -426,296 +301,8 @@ if (isset($_SESSION['user_id'])) {
     ';
     require BASE_PATH . '/src/Views/components/modal.php';
     ?>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            let activeConfirmForm = null;
-            const globalConfirmModal = document.getElementById('global-confirmation-modal');
-            const globalConfirmMessage = document.getElementById('global-confirmation-message');
-            const globalConfirmBtn = document.getElementById('global-confirm-btn');
-
-            document.querySelectorAll('.confirm-action').forEach(form => {
-                form.addEventListener('submit', (e) => {
-                    // Global confirmation interceptor. Pauses form submission, displays a customizable modal, 
-                    // and safely resumes the native submit flow if the user approves.
-                    if (form.dataset.confirmed === "true") {
-                        // It was confirmed by the modal, let it pass through to other listeners or native submit
-                        delete form.dataset.confirmed;
-                        return;
-                    }
-                    e.preventDefault();
-                    activeConfirmForm = form;
-                    globalConfirmMessage.textContent = form.dataset.message || 'Are you sure you want to proceed?';
-                    
-                    // Show modal logic
-                    globalConfirmModal.classList.remove('hidden');
-                    
-                    // Allow animation frame
-                    requestAnimationFrame(() => {
-                        globalConfirmModal.querySelector('.fixed.inset-0.bg-gray-900').classList.add('opacity-100');
-                        globalConfirmModal.querySelector('.relative.w-full').classList.add('scale-100', 'opacity-100');
-                    });
-                });
-            });
-
-            if (globalConfirmBtn) {
-                globalConfirmBtn.addEventListener('click', () => {
-                    if (activeConfirmForm) {
-                        globalConfirmModal.classList.add('hidden');
-                        activeConfirmForm.dataset.confirmed = "true";
-                        // Dispatch submit event so other JS listeners can intercept it, or it will submit natively
-                        const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-                        const cancelled = !activeConfirmForm.dispatchEvent(submitEvent);
-                        if (!cancelled) {
-                            activeConfirmForm.submit(); // Fallback if no listener prevented default
-                        }
-                    }
-                });
-            }
-
-            // Close modal logic for global confirmation is handled by close-modal-btn logic which we also need to include or assume exists.
-            // Let's add a generic close modal listener since it might not be defined globally yet.
-            document.querySelectorAll('.close-modal-btn, .close-modal-backdrop').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const modalId = btn.dataset.modal;
-                    if (!modalId) return;
-                    
-                    // If the click is on the backdrop, ensure we clicked the backdrop itself and not children
-                    if (btn.classList.contains('close-modal-backdrop') && e.target !== btn) {
-                        return;
-                    }
-
-                    const targetModal = document.getElementById(modalId);
-                    if (targetModal) {
-                        targetModal.classList.add('hidden');
-                        if (modalId === 'global-confirmation-modal') {
-                            activeConfirmForm = null;
-                        }
-                    }
-                });
-            });
-
-            // Generic open modal listener
-            document.querySelectorAll('.open-modal-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const modalId = btn.dataset.modal;
-                    if (!modalId) return;
-                    const targetModal = document.getElementById(modalId);
-                    if (targetModal) {
-                        targetModal.classList.remove('hidden');
-                    }
-                });
-            });
-        });
-
-        // Notification & Toast System Logic
-        (function() {
-            window.__shownNotifIds = window.__shownNotifIds || new Set();
-
-            console.log('[DTS Notif System] Initialized. Existing known notifications count:', window.__shownNotifIds.size);
-
-            // Auto-dismiss toast messages after 5 seconds
-            function setupToastAutoDismiss() {
-                const toasts = document.querySelectorAll('#toast-container .toast-message');
-                console.log(`[DTS Notif System] setupToastAutoDismiss running. Found ${toasts.length} toast message(s).`);
-
-                toasts.forEach((toast, idx) => {
-                    if (toast.dataset.dismissScheduled) return;
-                    toast.dataset.dismissScheduled = "true";
-                    console.log(`[DTS Notif System] Toast #${idx + 1} scheduled for auto-dismiss in 5s.`);
-
-                    setTimeout(() => {
-                        if (toast.parentNode) {
-                            console.log(`[DTS Notif System] Fading out Toast #${idx + 1}.`);
-                            toast.style.transition = 'opacity 0.5s ease-out';
-                            toast.style.opacity = '0';
-                            setTimeout(() => {
-                                toast.remove();
-                                console.log(`[DTS Notif System] Removed Toast #${idx + 1} from DOM.`);
-                            }, 500);
-                        }
-                    }, 5000);
-                });
-            }
-
-            // Seed known unread notification IDs from DOM on load
-            function syncShownNotificationIds() {
-                const items = document.querySelectorAll('#notification-list .mark-notification-read');
-                items.forEach(btn => {
-                    if (btn.dataset.id) {
-                        window.__shownNotifIds.add(String(btn.dataset.id));
-                    }
-                });
-                console.log(`[DTS Notif System] Synced ${items.length} unread notification IDs into memory set.`);
-            }
-
-            // Fetch unread notifications from API to capture background job updates
-            async function pollUnreadNotifications() {
-                console.log('[DTS Notif System] Polling /api/notifications/unread...');
-                try {
-                    const res = await fetch('/api/notifications/unread');
-                    if (!res.ok) {
-                        console.warn('[DTS Notif System] Poll response non-OK status:', res.status);
-                        return;
-                    }
-
-                    const data = await res.json();
-                    console.log('[DTS Notif System] Poll response received:', data);
-
-                    if (!data.success || !Array.isArray(data.notifications)) return;
-
-                    // Check for newly arrived notifications that haven't been alerted as toasts
-                    const toastContainer = document.getElementById('toast-container');
-                    data.notifications.forEach(notif => {
-                        const notifIdStr = String(notif.id);
-                        if (!window.__shownNotifIds.has(notifIdStr)) {
-                            window.__shownNotifIds.add(notifIdStr);
-                            console.log(`[DTS Notif System] New unread notification detected (ID ${notif.id}): "${notif.title}" - popping toast modal.`);
-
-                            if (toastContainer) {
-                                let iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />';
-                                let borderColor = 'border-blue-500', bgColor = 'bg-blue-50 dark:bg-blue-900', iconColor = 'text-blue-700 dark:text-blue-400', titleColor = 'text-blue-800 dark:text-blue-300', textColor = 'text-blue-700 dark:text-blue-400';
-                                
-                                if (notif.type === 'success') {
-                                    borderColor = 'border-green-500'; bgColor = 'bg-green-50 dark:bg-green-900'; iconColor = 'text-green-700 dark:text-green-400'; titleColor = 'text-green-800 dark:text-green-300'; textColor = 'text-green-700 dark:text-green-400';
-                                    iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />';
-                                } else if (notif.type === 'error') {
-                                    borderColor = 'border-red-500'; bgColor = 'bg-red-50 dark:bg-red-900'; iconColor = 'text-red-700 dark:text-red-400'; titleColor = 'text-red-800 dark:text-red-300'; textColor = 'text-red-700 dark:text-red-400';
-                                    iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />';
-                                }
-
-                                const toastHtml = `
-                                    <div role="alert" class="rounded-md border ${borderColor} ${bgColor} p-4 shadow-sm mb-3 relative toast-message pointer-events-auto animate-slide-in-right">
-                                        <div class="flex items-start gap-4">
-                                            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="-mt-0.5 w-6 h-6 ${iconColor}">
-                                                ${iconSvg}
-                                            </svg>
-                                            <div class="flex-1 pr-6">
-                                                <strong class="block leading-tight font-medium ${titleColor}"> ${notif.title} </strong>
-                                                <p class="mt-0.5 text-sm ${textColor}">${notif.message}</p>
-                                            </div>
-                                            <button class="mark-notification-read absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition" data-id="${notif.id}" title="Dismiss">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                `;
-                                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-                                setupToastAutoDismiss();
-                            }
-                        }
-                    });
-                } catch (err) {
-                    console.error('[DTS Notif System] Error polling unread notifications:', err);
-                }
-            }
-
-            // Global event delegation for notification dropdown, dismiss, and mark as read buttons
-            document.addEventListener('click', async (e) => {
-                const notifBtn = e.target.closest('#notification-menu-button');
-                if (notifBtn) {
-                    e.stopPropagation();
-                    const dropdown = document.getElementById('notification-dropdown-menu');
-                    if (dropdown) {
-                        dropdown.classList.toggle('hidden');
-                        console.log('[DTS Notif System] Toggled dropdown menu. Hidden:', dropdown.classList.contains('hidden'));
-                    }
-                    return;
-                }
-
-                const notifDropdown = document.getElementById('notification-dropdown-menu');
-                if (notifDropdown && !notifDropdown.contains(e.target) && !e.target.closest('#notification-menu-button')) {
-                    if (!notifDropdown.classList.contains('hidden')) {
-                        notifDropdown.classList.add('hidden');
-                        console.log('[DTS Notif System] Closed dropdown menu on outside click.');
-                    }
-                }
-
-                const markReadBtn = e.target.closest('.mark-notification-read');
-                if (markReadBtn) {
-                    e.stopPropagation();
-                    const notifId = markReadBtn.dataset.id;
-                    if (!notifId) return;
-
-                    console.log(`[DTS Notif System] Marking notification ID ${notifId} as read.`);
-                    try {
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-                        const res = await fetch('/api/notifications/mark-read', {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken
-                            },
-                            body: JSON.stringify({ id: notifId })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            console.log(`[DTS Notif System] Notification ID ${notifId} marked read successfully.`);
-                            markReadBtn.closest('[role="alert"]')?.remove();
-                        }
-                    } catch (err) {
-                        console.error('[DTS Notif System] Error marking notification read:', err);
-                    }
-                    return;
-                }
-
-                const dismissBtn = e.target.closest('.dismiss-alert');
-                if (dismissBtn) {
-                    e.stopPropagation();
-                    console.log('[DTS Notif System] Dismissing alert manually.');
-                    dismissBtn.closest('[role="alert"]')?.remove();
-                    return;
-                }
-
-                const markAllBtn = e.target.closest('#mark-all-read');
-                if (markAllBtn) {
-                    e.stopPropagation();
-                    console.log('[DTS Notif System] Marking ALL notifications as read.');
-                    try {
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-                        const res = await fetch('/api/notifications/mark-read', {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken
-                            },
-                            body: JSON.stringify({})
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            console.log('[DTS Notif System] All notifications marked read successfully.');
-                            const list = document.getElementById('notification-list');
-                            if (list) {
-                                list.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 p-4 text-center">No new notifications.</p>';
-                            }
-                            markAllBtn.remove();
-                        }
-                    } catch (err) {
-                        console.error('[DTS Notif System] Error marking all notifications read:', err);
-                    }
-                    return;
-                }
-            });
-
-            // Lifecycle hooks
-            document.addEventListener('DOMContentLoaded', () => {
-                console.log('[DTS Notif System] Lifecycle: DOMContentLoaded');
-                setupToastAutoDismiss();
-                syncShownNotificationIds();
-            });
-
-            document.addEventListener('dts:page-loaded', () => {
-                console.log('[DTS Notif System] Lifecycle: dts:page-loaded');
-                setupToastAutoDismiss();
-                syncShownNotificationIds();
-                pollUnreadNotifications();
-            });
-
-            // Periodically poll for background notifications every 30s
-            setInterval(pollUnreadNotifications, 30000);
-        })();
-    </script>
-
+    <script src="/js/common.js"></script>
+    <script src="/js/app.js"></script>
     <!-- PJAX Router: must be loaded last so all layout-level DOM is available -->
     <script src="/js/pjax-router.js"></script>
 </body>

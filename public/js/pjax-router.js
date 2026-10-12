@@ -52,19 +52,22 @@
 
     // Re-executes <script src="..."> tags found inside the swapped container.
     // innerHTML assignment does not run scripts; we must clone and re-append them.
-    // Inline <script> blocks (not src-based) are also re-executed this way.
+    // Views contain no inline JavaScript (the CSP forbids it); data blocks such as
+    // <script type="application/json"> are left as they are, never executed.
     function reExecuteScripts(container) {
-        container.querySelectorAll('script').forEach(oldScript => {
-            const newScript = document.createElement('script');
-
-            if (oldScript.src) {
-                // Cache-bust with timestamp to force re-evaluation by the browser
-                newScript.src = oldScript.src.split('?')[0] + '?_pjax=' + Date.now();
-                newScript.defer = oldScript.defer;
-                newScript.async = oldScript.async;
-            } else {
-                newScript.textContent = oldScript.textContent;
+        container.querySelectorAll('script[src]').forEach(oldScript => {
+            const type = (oldScript.getAttribute('type') || '').toLowerCase();
+            if (type && type !== 'text/javascript' && type !== 'module') {
+                return;
             }
+
+            const newScript = document.createElement('script');
+            // Cache-bust with timestamp to force re-evaluation by the browser
+            newScript.src = oldScript.src.split('?')[0] + '?_pjax=' + Date.now();
+            if (type) newScript.type = type;
+            // Dynamically inserted scripts are async by default; keep document order so a
+            // library (e.g. html5-qrcode, Sortable) runs before the page script that uses it
+            newScript.async = false;
 
             oldScript.replaceWith(newScript);
         });

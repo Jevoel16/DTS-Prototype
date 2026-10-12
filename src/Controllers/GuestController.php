@@ -10,6 +10,8 @@ use chillerlan\QRCode\QROptions;
 
 class GuestController
 {
+    private const MAX_TRACKED_CODES = 10;
+
     public function welcome()
     {
         $db = Database::getInstance();
@@ -39,15 +41,23 @@ class GuestController
         $db = Database::getInstance();
 
         [$errors, $validated] = Validator::validate($_POST, [
-            'guest_name' => 'required',
-            'guest_email' => 'email',
-            'guest_phone' => 'required',
-            'district' => 'required',
-            'department' => 'required',
-            'title' => 'required',
-            'purpose_id' => 'required',
-            'other_purpose_text' => ''
+            'guest_name' => 'required|max:120',
+            'guest_email' => 'email|max:190',
+            'guest_phone' => 'required|phone',
+            'district' => 'required|max:120',
+            'department' => 'required|max:190',
+            'title' => 'required|max:140',
+            'purpose_id' => 'required|max:20',
+            'other_purpose_text' => 'max:100'
         ]);
+
+        // Department names drive routing, so only accept ones that exist
+        if (empty($errors['department'])) {
+            $deptExists = $db->query("SELECT 1 FROM departments WHERE name = :name", [':name' => $validated['department']])->fetch();
+            if (!$deptExists) {
+                $errors['department'] = "Please choose a unit/department from the list.";
+            }
+        }
 
         if (!empty($errors)) {
             $_SESSION['error'] = implode("<br>", $errors);
@@ -66,11 +76,16 @@ class GuestController
             $trackingCode = $result['tracking_code'];
             $documentId = $result['document_id'];
         } catch (\Exception $e) {
-            $_SESSION['error'] = "An error occurred during submission: " . $e->getMessage();
+            // Log the details; never show database errors to anonymous visitors
+            error_log("Guest submission failed: " . $e->getMessage());
+            $_SESSION['error'] = "An error occurred during submission. Please check your entries and try again.";
             $_SESSION['old'] = $_POST;
             header("Location: /");
             exit;
         }
+
+        // Lets this guest (and only this session) print the tracking form without signing in
+        $_SESSION['submitted_codes'] = array_slice(array_merge($_SESSION['submitted_codes'] ?? [], [$trackingCode]), -20);
 
         header("Location: /success?tracking_code={$trackingCode}&document_id={$documentId}");
         exit;
@@ -104,8 +119,7 @@ class GuestController
     // Aggregates tracking data and full audit logs for one or more documents requested by a guest.
     public function track()
     {
-        $codesParam = $_GET['codes'] ?? '';
-        $trackingCodes = array_filter(array_map('trim', explode(',', $codesParam)));
+        $trackingCodes = self::parseTrackingCodes($_GET['codes'] ?? '');
 
         if (empty($trackingCodes)) {
             $_SESSION['info'] = "Please enter a tracking code to view its status.";
@@ -141,8 +155,7 @@ class GuestController
 
     public function getStatusUpdates()
     {
-        $codesParam = $_GET['codes'] ?? '';
-        $trackingCodes = array_filter(array_map('trim', explode(',', $codesParam)));
+        $trackingCodes = self::parseTrackingCodes($_GET['codes'] ?? '');
 
         if (empty($trackingCodes)) {
             header('Content-Type: application/json');
@@ -160,5 +173,17 @@ class GuestController
 
         header('Content-Type: application/json');
         echo json_encode($statuses);
+    }
+
+    /**
+     * Parse a comma-separated list of tracking codes, keeping at most MAX_TRACKED_CODES well-formed ones
+     * so a single request cannot be used to probe thousands of codes.
+     */
+    private static function parseTrackingCodes(string $codesParam): array
+    {
+        $codes = array_filter(array_map('trim', explode(',', $codesParam)), function ($code) {
+            return preg_match('/^[A-Za-z0-9\-]{1,64}$/', $code) === 1;
+        });
+        return array_slice(array_values(array_unique($codes)), 0, self::MAX_TRACKED_CODES);
     }
 }

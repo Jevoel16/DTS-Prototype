@@ -20,6 +20,13 @@ function tableExists(Database $db, string $schema, string $table): bool {
     )->fetch();
 }
 
+function columnExists(Database $db, string $schema, string $table, string $column): bool {
+    return (bool) $db->query(
+        'SELECT 1 FROM information_schema.columns WHERE table_schema = :s AND table_name = :t AND column_name = :c',
+        ['s' => $schema, 't' => $table, 'c' => $column]
+    )->fetch();
+}
+
 function indexExists(Database $db, string $schema, string $table, string $index): bool {
     return (bool) $db->query(
         'SELECT 1 FROM information_schema.statistics WHERE table_schema = :s AND table_name = :t AND index_name = :i',
@@ -36,6 +43,7 @@ $indexes = [
     ['departments',   'idx_department_name',     '(name)'],
     ['purposes',      'idx_purpose_name',        '(name)'],
     ['documents',     'idx_doc_updated_at',      '(updated_at)'],
+    ['documents',     'idx_doc_dept_status',     '(current_department_id, status)'],
     ['notifications', 'idx_notif_dept_unread',   '(department_id, is_read, created_at)'],
     ['notifications', 'idx_notif_user_unread',   '(user_id, is_read, created_at)'],
 ];
@@ -63,6 +71,27 @@ foreach (['job_batches', 'password_reset_tokens', 'sessions', 'cache_locks', 'pr
     if (tableExists($db, $schema, $table)) {
         $db->query("DROP TABLE `$table`");
         echo "  - table $table\n";
+    }
+}
+
+// 4. Security hardening: rate limiter storage and the keyed seal on hash-chain logs
+if (!tableExists($db, $schema, 'rate_limits')) {
+    $db->query("CREATE TABLE rate_limits ( `key` VARCHAR(191) PRIMARY KEY, hits INT UNSIGNED NOT NULL DEFAULT 0, reset_at INT UNSIGNED NOT NULL, INDEX idx_rate_limits_reset (reset_at) )");
+    echo "  + table rate_limits\n";
+}
+if (!columnExists($db, $schema, 'document_logs', 'seal')) {
+    $db->query("ALTER TABLE document_logs ADD COLUMN seal CHAR(64) NULL AFTER hash");
+    echo "  + document_logs.seal (set APP_INTEGRITY_KEY in .env, then run: composer run seal)\n";
+}
+
+// 5. Routing and staff authorization match departments by name, so names must be unique
+if (!indexExists($db, $schema, 'departments', 'uniq_department_name')) {
+    $dupes = $db->query("SELECT name FROM departments GROUP BY name HAVING COUNT(*) > 1")->fetchAll(\PDO::FETCH_COLUMN);
+    if ($dupes) {
+        echo "  ! departments has duplicate names (" . implode(', ', $dupes) . "); merge them, then re-run to add uniq_department_name\n";
+    } else {
+        $db->query("ALTER TABLE departments ADD UNIQUE INDEX uniq_department_name (name)");
+        echo "  + departments.uniq_department_name\n";
     }
 }
 
