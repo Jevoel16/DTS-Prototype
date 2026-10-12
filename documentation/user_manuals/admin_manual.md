@@ -6,7 +6,7 @@
 
 ## 1. Overview & Role Summary
 
-As a **System Administrator** (`admin`), you manage user accounts, watch division-wide workload, verify the integrity of every document's signed history, respond to tampering, and keep backups. Day-to-day document processing (intake, receiving, releasing) is done by Records Officers and Department Staff, not by admins.
+As a **System Administrator** (`admin.ict.dts`), you manage user accounts, watch division-wide workload, verify the integrity of every document's signed history, respond to tampering, and keep backups. Day-to-day document processing (intake, receiving, releasing) is done by Records Officers and Department Staff, not by admins.
 
 ---
 
@@ -28,7 +28,7 @@ As a **System Administrator** (`admin`), you manage user accounts, watch divisio
 
 Admin actions that change documents (freeze, unfreeze, auto-resolve, Freeze All) are signed with your **Ed25519 digital signature**.
 
-1. Sign in at `/login` with username `admin` (or your own admin account).
+1. Sign in at `/login` with username `admin.ict.dts` (or your own admin account).
 2. The window **Action Required: Setup Your Digital Signature** appears. Enter a **PIN of at least 6 characters**, confirm it, and click **Generate & Secure Key**.
 3. Your private key is encrypted with a key derived from your PIN (Argon2id) and stored in `users.private_key`; your public key goes to `users.public_key` and is recorded in `user_public_key_histories`.
 

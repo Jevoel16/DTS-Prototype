@@ -29,7 +29,7 @@ As a **Records Officer** (`officer`), you are the gateway for every document ent
 
 Every action that changes a document (finalize, decline, receive, complete, release) is signed with your personal **Ed25519 digital signature**.
 
-1. Sign in at `/login` with your username (e.g. `records.unit`) and password.
+1. Sign in at `/login` with your username (e.g. `officer.recordsunit.dts`) and password.
 2. On your first login a window titled **Action Required: Setup Your Digital Signature** appears over the page. You cannot perform any action until you finish it.
 3. Enter a **Security PIN of at least 6 characters** and confirm it.
 4. Click **Generate & Secure Key**. The system creates your key pair and stores your private key encrypted with your PIN.

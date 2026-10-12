@@ -230,25 +230,31 @@ async function setupDatabase() {
         // Admin User
         await connection.query(
             "INSERT INTO users (name, email, password, role, created_at, updated_at) VALUES (?, ?, ?, 'admin', NOW(), NOW())",
-            ['Admin User', 'admin', hashedPassword]
+            ['Admin User', 'admin.ict.dts', hashedPassword]
         );
 
+        // Department username slug: names with more than 2 words (ignoring "and") become
+        // initials (Bids and Awards Committee Unit -> bacu); otherwise the words are joined
+        // (Health and Nutrition -> healthandnutrition, Cash Unit -> cashunit).
+        const deptSlug = (name) => {
+            const words = name.toLowerCase().split(/\s+/).filter(Boolean);
+            const significant = words.filter(w => w !== 'and');
+            return significant.length > 2 ? significant.map(w => w[0]).join('') : words.join('');
+        };
+
         const [depts] = await connection.query('SELECT id, name FROM departments');
-        
+
         for (const dept of depts) {
+            const slug = deptSlug(dept.name);
             if (dept.name === 'Records Unit') {
                 await connection.query(
                     "INSERT INTO users (name, email, password, department_id, role, created_at, updated_at) VALUES (?, ?, ?, ?, 'officer', NOW(), NOW())",
-                    ['Records Officer', 'records.unit', hashedPassword, dept.id]
+                    ['Records Officer', `officer.${slug}.dts`, hashedPassword, dept.id]
                 );
             } else {
-                // Generate clean department username slug (e.g., cash.unit, administrative.unit)
-                const slug = dept.name.toLowerCase().replace(/ and /g, '.and.').replace(/ /g, '.');
-                const email = slug;
-                
                 await connection.query(
                     "INSERT INTO users (name, email, password, department_id, role, created_at, updated_at) VALUES (?, ?, ?, ?, 'staff', NOW(), NOW())",
-                    [`${dept.name} Staff`, email, hashedPassword, dept.id]
+                    [`${dept.name} Staff`, `staff.${slug}.dts`, hashedPassword, dept.id]
                 );
             }
         }

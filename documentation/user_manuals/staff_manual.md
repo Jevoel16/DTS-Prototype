@@ -27,7 +27,7 @@ As **Department Staff** (`staff`), you handle documents routed to your office (e
 
 Every receive and complete action is signed with your personal **Ed25519 digital signature**.
 
-1. Sign in at `/login` with your department username (e.g. `budget.unit`) and password.
+1. Sign in at `/login` with your department username (e.g. `staff.budgetunit.dts`) and password.
 2. A window titled **Action Required: Setup Your Digital Signature** appears. You cannot act on documents until you finish it.
 3. Enter a **Security PIN of at least 6 characters**, confirm it, and click **Generate & Secure Key**.
 

@@ -408,21 +408,21 @@ All seeded accounts use the password **`password`**.
 
 | Role | Username |
 | :--- | :--- |
-| Administrator | `admin` |
-| Records Officer | `records.unit` |
-| Staff: Cash Unit | `cash.unit` |
-| Staff: Administrative Unit | `administrative.unit` |
-| Staff: Personnel | `personnel.unit` |
-| Staff: Supply Unit | `supply.unit` |
-| Staff: Budget Unit | `budget.unit` |
-| Staff: Accounting | `accounting.unit` |
-| Staff: Legal Unit | `legal.unit` |
-| Staff: Health & Nutrition | `health.and.nutrition` |
-| Staff: Bids and Awards Committee | `bids.and.awards.committee.unit` |
-| Staff: Schools Division Superintendent Office | `schools.division.superintendent.office` |
-| Staff: Assistant SDS Office | `assistant.schools.division.superintendent.office` |
-| Staff: Curriculum Implementation Division | `curriculum.implementation.division` |
-| Staff: School Governance and Operations Division | `school.governance.and.operations.division` |
+| Administrator | `admin.ict.dts` |
+| Records Officer | `officer.recordsunit.dts` |
+| Staff: Cash Unit | `staff.cashunit.dts` |
+| Staff: Administrative Unit | `staff.administrativeunit.dts` |
+| Staff: Personnel | `staff.personnelunit.dts` |
+| Staff: Supply Unit | `staff.supplyunit.dts` |
+| Staff: Budget Unit | `staff.budgetunit.dts` |
+| Staff: Accounting | `staff.accountingunit.dts` |
+| Staff: Legal Unit | `staff.legalunit.dts` |
+| Staff: Health & Nutrition | `staff.healthandnutrition.dts` |
+| Staff: Bids and Awards Committee | `staff.bacu.dts` |
+| Staff: Schools Division Superintendent Office | `staff.sdso.dts` |
+| Staff: Assistant SDS Office | `staff.asdso.dts` |
+| Staff: Curriculum Implementation Division | `staff.cid.dts` |
+| Staff: School Governance and Operations Division | `staff.sgod.dts` |
 
 ---
 
