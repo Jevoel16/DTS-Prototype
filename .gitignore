@@ -48,9 +48,4 @@ Thumbs.db
 docs/
 
 # --- Thesis paper: private references & templates ---
-/paper/references/*
-/paper/TEMPLATES/*
-/paper/Templates (converted)/
-/paper/\[DRAFT] Thesis nilang Jove.md
-/paper/PITCH_SCRIPT.md
-/paper/ITE193/*
+paper/*
