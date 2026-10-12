@@ -1,4 +1,4 @@
-<?php ob_start(); ?>
+<?php $title = 'Backup Manager'; ob_start(); ?>
 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
     Backup Manager
 </h2>

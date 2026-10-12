@@ -40,7 +40,7 @@ class GuestController
 
         [$errors, $validated] = Validator::validate($_POST, [
             'guest_name' => 'required',
-            'guest_email' => 'required|email',
+            'guest_email' => 'email',
             'guest_phone' => 'required',
             'district' => 'required',
             'department' => 'required',

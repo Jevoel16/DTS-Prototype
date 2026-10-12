@@ -1,4 +1,4 @@
-<?php ob_start(); ?>
+<?php $title = 'Manage Route — ' . ($document['tracking_code'] ?? 'Document'); ob_start(); ?>
 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
     Manage Document Route: <?php echo htmlspecialchars($document['tracking_code']); ?>
 </h2>

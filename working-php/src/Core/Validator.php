@@ -26,7 +26,7 @@ class Validator
                     $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " is required.";
                     break;
                 }
-                if ($rule === 'email' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                if ($rule === 'email' && trim((string)$value) !== '' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
                     $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " must be a valid email.";
                 }
                 if (str_starts_with($rule, 'min:')) {

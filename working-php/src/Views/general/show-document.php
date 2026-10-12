@@ -1,4 +1,4 @@
-<?php ob_start(); ?>
+<?php $title = 'Document — ' . ($document['tracking_code'] ?? 'Details'); ob_start(); ?>
 <div class="flex justify-between items-center w-full">
     <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
         Document Details: <?php echo htmlspecialchars($document['tracking_code']); ?>

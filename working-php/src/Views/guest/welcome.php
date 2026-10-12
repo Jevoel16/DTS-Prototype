@@ -40,6 +40,7 @@
                         <option value="North II District" <?= old('district') === 'North II District' ? 'selected' : '' ?>>North II District</option>
                         <option value="North III District" <?= old('district') === 'North III District' ? 'selected' : '' ?>>North III District</option>
                         <option value="City Central District" <?= old('district') === 'City Central District' ? 'selected' : '' ?>>City Central District</option>
+                        <option value="N/A" <?= old('district') === 'N/A' ? 'selected' : '' ?>>N/A</option>
                     </select>
                     <?php if (has_error('district')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('district') ?></p><?php endif; ?>
                 </div>

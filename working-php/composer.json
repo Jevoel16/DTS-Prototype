@@ -23,6 +23,7 @@
     },
     "scripts": {
         "dev": "php scripts/dev.php",
+        "prod": "php scripts/prod.php",
         "worker": "php console.php",
         "proxy": "cloudflared tunnel --url http://localhost:8000",
         "corrupt": "php scripts/corrupt.php",
