@@ -1,6 +1,7 @@
 <?php
 /**
- * Seals unsealed document_logs rows with APP_INTEGRITY_KEY (HMAC over each block hash).
+ * Seals unsealed document_logs rows with APP_INTEGRITY_KEY (HMAC over each block hash), then
+ * gives every unsealed document a chain seal (HMAC over its workflow state and newest log entry).
  * Only documents whose hash chain still verifies are sealed; broken chains are listed instead,
  * so tampered history is never sealed.
  *
@@ -24,10 +25,11 @@ if (IntegrityManager::integrityKey() === '') {
 echo "🔏 Sealing document logs...\n";
 $result = IntegrityManager::sealPendingLogs();
 echo "   Sealed " . number_format($result['sealed']) . " log(s).\n";
+echo "   Sealed the chain head (workflow state + newest entry) of " . number_format($result['sealed_heads']) . " document(s).\n";
 
 if (!empty($result['skipped_documents'])) {
     $count = count($result['skipped_documents']);
-    echo "   ⚠️  {$count} document(s) have a broken hash chain and were NOT sealed. Investigate them first:\n";
+    echo "   ⚠️  {$count} document(s) have a broken hash chain or altered data and were NOT sealed. Investigate them first:\n";
     echo "   document ids: " . implode(', ', array_slice($result['skipped_documents'], 0, 50)) . ($count > 50 ? ', ...' : '') . "\n";
     exit(1);
 }

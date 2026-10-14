@@ -10,6 +10,14 @@ require BASE_PATH . '/vendor/autoload.php';
 
 $appConfig = require BASE_PATH . '/src/Config/config.php';
 
+// Sessions live in the app's own folder, not the shared OS temp folder: other PHP apps can't read
+// or clear them, and the seeders can reset this app's sessions without touching anyone else's.
+$sessionPath = BASE_PATH . '/storage/sessions';
+if (!is_dir($sessionPath)) {
+    mkdir($sessionPath, 0770, true);
+}
+session_save_path($sessionPath);
+
 // Front Controller & Session Hardening.
 // In production the cookie is always Secure, even if TLS ends at a proxy and PHP sees plain HTTP.
 session_start([
@@ -31,6 +39,16 @@ date_default_timezone_set('Asia/Manila');
 // Error display follows APP_DEBUG in .env (errors are always logged)
 $debug = $appConfig['app']['debug'];
 ini_set('display_errors', $debug ? '1' : '0');
+
+// Never advertise the PHP version (NGINX also strips it). The PHP built-in development server has
+// no NGINX in front, so send the core security headers here in that case.
+header_remove('X-Powered-By');
+if (PHP_SAPI === 'cli-server') {
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+    header('X-Frame-Options: DENY');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: same-origin');
+}
 ini_set('display_startup_errors', $debug ? '1' : '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
@@ -62,11 +80,13 @@ $router->get('/success', [App\Controllers\GuestController::class, 'success']);
 $router->get('/track', [App\Controllers\GuestController::class, 'track'], [
     App\Middleware\RateLimitMiddleware::class . ':track,60,60'
 ]);
+// Separate buckets: the tracking page's own background polling must not use up the allowance for
+// lookups, and offices or schools often share one public IP. Every request is still capped per IP.
 $router->get('/api/track/module/(?P<tracking_code>[A-Za-z0-9\-]+)', [App\Controllers\GuestController::class, 'getTrackedDocumentModule'], [
-    App\Middleware\RateLimitMiddleware::class . ':track,60,60'
+    App\Middleware\RateLimitMiddleware::class . ':track-module,120,60'
 ]);
 $router->get('/api/track/status', [App\Controllers\GuestController::class, 'getStatusUpdates'], [
-    App\Middleware\RateLimitMiddleware::class . ':track,60,60'
+    App\Middleware\RateLimitMiddleware::class . ':track-poll,240,60'
 ]);
 
 // Role-based dashboard redirect — routes each role to its dedicated landing page.
@@ -175,6 +195,14 @@ $router->get('/integrity-monitor', function() {
 }, [
     App\Middleware\AuthMiddleware::class,
     App\Middleware\RoleMiddleware::class . ':admin'
+]);
+
+// Account: self-service password change (also where temporary/default passwords are replaced)
+$router->get('/account/password', [App\Controllers\AccountController::class, 'showPasswordForm'], [
+    App\Middleware\AuthMiddleware::class
+]);
+$router->post('/account/password', [App\Controllers\AccountController::class, 'updatePassword'], [
+    App\Middleware\AuthMiddleware::class
 ]);
 
 // Security key setup
@@ -302,14 +330,15 @@ $router->post('/documents/(?P<tracking_code>[A-Za-z0-9\-]+)/autoresolve', [App\C
     App\Middleware\RoleMiddleware::class . ':admin'
 ]);
 
+// Intake (finalize/decline) belongs to the Records Officer, matching the /intake and manage pages
 $router->post('/documents/(?P<id>\d+)/finalize', [App\Controllers\DocumentController::class, 'finalize'], [
     App\Middleware\AuthMiddleware::class,
-    App\Middleware\RoleMiddleware::class . ':admin,officer'
+    App\Middleware\RoleMiddleware::class . ':officer'
 ]);
 
 $router->post('/documents/decline', [App\Controllers\DocumentController::class, 'decline'], [
     App\Middleware\AuthMiddleware::class,
-    App\Middleware\RoleMiddleware::class . ':admin,officer'
+    App\Middleware\RoleMiddleware::class . ':officer'
 ]);
 
 $router->get('/tasks/completed', [App\Controllers\DashboardController::class, 'officerCompletedTasks'], [

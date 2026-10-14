@@ -111,7 +111,7 @@ if (isset($_SESSION['user_id'])) {
                     </div>
 
                     <div class="flex items-center">
-                        <button id="theme-toggle" class="mr-2 sm:mr-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-full shadow-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-accent-1-hover transition-colors">
+                        <button type="button" id="theme-toggle" aria-label="Toggle dark mode" class="mr-2 sm:mr-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-full shadow-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-accent-1-hover transition-colors">
                             <!-- Sun icon for light mode -->
                             <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
                             <!-- Moon icon for dark mode -->
@@ -156,6 +156,7 @@ if (isset($_SESSION['user_id'])) {
                             </button>
 
                             <div id="user-dropdown-menu" class="hidden absolute right-0 z-50 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none py-1">
+                                <a href="/account/password" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">Change Password</a>
                                 <form method="POST" action="/logout">
                                     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
                                     <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition duration-150 ease-in-out">Log Out</button>
@@ -187,7 +188,8 @@ if (isset($_SESSION['user_id'])) {
                         <div class="font-medium text-base text-gray-800 dark:text-gray-200"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Guest') ?></div>
                         <div class="font-medium text-sm text-gray-500 dark:text-gray-400"><?= htmlspecialchars(ucfirst($_SESSION['role'] ?? '')) ?></div>
                     </div>
-                    <form method="POST" action="/logout" class="mt-3">
+                    <a href="/account/password" class="mt-3 block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">Change Password</a>
+                    <form method="POST" action="/logout">
                         <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
                         <button type="submit" class="block w-full text-left pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">Log Out</button>
                     </form>
@@ -195,7 +197,8 @@ if (isset($_SESSION['user_id'])) {
             </div>
         </nav>
 
-        <!-- Page Heading -->
+        <!-- Page Heading (page titles are h2; this gives every page a single h1 for screen readers) -->
+        <h1 class="sr-only">DepEd Document Tracking System</h1>
         <?php if (isset($header)): ?>
             <!-- pjax-router.js also swaps this element's innerHTML after each navigation -->
             <header id="pjax-header" class="bg-white dark:bg-gray-800 shadow dark:shadow-none border-b border-gray-200 dark:border-gray-700 relative z-10">
@@ -244,7 +247,7 @@ if (isset($_SESSION['user_id'])) {
         <?php unset($_SESSION['console_error']); ?>
     <?php endif; ?>
 
-    <?php if (isset($_SESSION['needs_security_key']) && $_SESSION['needs_security_key']): ?>
+    <?php if (!empty($_SESSION['needs_security_key']) && empty($_SESSION['must_change_password'])): ?>
     <?php
     $modalId = 'security-key-modal';
     $modalTitle = 'Action Required: Setup Your Digital Signature';

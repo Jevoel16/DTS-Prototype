@@ -51,13 +51,41 @@ function runScheduledTasks(int &$lastSampleTime, int &$lastBackfillTime, int &$l
         }
     }
 
-    // 2. Departmental TAT & Volume Metrics Backfill every 30 minutes (1800s)
-    if ($now - $lastBackfillTime >= 1800) {
+    // 2. Departmental TAT & Volume Metrics Backfill every 5 minutes (300s): only the last 2 days are
+    // recomputed, which is cheap, and it keeps the department statistics charts close to live
+    if ($now - $lastBackfillTime >= 300) {
         $lastBackfillTime = $now;
         $scriptPath = BASE_PATH . '/scripts/backfill-metrics.php';
         if (file_exists($scriptPath)) {
             echo "⏰ [Worker Scheduler] Running departmental metrics backfill...\n";
             passthru(PHP_BINARY . ' ' . escapeshellarg($scriptPath));
+        }
+    }
+
+    // 2b. Abandoned jobs every 5 minutes: a job still reserved long after the longest job's time limit
+    // (its process crashed, or the row came back from a backup) would otherwise block forever.
+    // It is moved to failed_jobs rather than retried, since re-running a backup or restore unasked is unsafe.
+    static $lastAbandonedJobCheck = 0;
+    if ($now - $lastAbandonedJobCheck >= 300) {
+        $lastAbandonedJobCheck = $now;
+        try {
+            $db = \App\Core\Database::getInstance();
+            $abandoned = $db->query("SELECT * FROM jobs WHERE reserved_at IS NOT NULL AND reserved_at < UNIX_TIMESTAMP() - 1800")->fetchAll();
+            foreach ($abandoned as $job) {
+                $db->query(
+                    "INSERT INTO failed_jobs (uuid, connection, queue, payload, exception, failed_at) VALUES (:uuid, 'database', :queue, :payload, :exception, NOW())",
+                    [
+                        'uuid' => uniqid('abandoned-', true),
+                        'queue' => $job['queue'],
+                        'payload' => $job['payload'],
+                        'exception' => "Abandoned: still reserved " . (int) ((time() - (int) $job['reserved_at']) / 60) . " minutes after it was claimed (worker process ended without finishing).",
+                    ]
+                );
+                $db->query("DELETE FROM jobs WHERE id = :id", ['id' => $job['id']]);
+                echo "⏰ [Worker Scheduler] Moved abandoned Job ID {$job['id']} to failed jobs.\n";
+            }
+        } catch (\Throwable $e) {
+            echo "⏰ [Worker Scheduler] Abandoned job check failed: " . $e->getMessage() . "\n";
         }
     }
 

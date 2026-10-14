@@ -267,7 +267,8 @@ $conn->exec("SET SESSION innodb_lock_wait_timeout = 3600");
 
 // --- Truncate & Flush Active Sessions ---
 echo "🧹 Cleaning tables, active session files, and response caches...\n";
-$savePath = session_save_path() ?: sys_get_temp_dir();
+// Only this app's session folder (see public/index.php), never the shared OS temp folder
+$savePath = BASE_PATH . '/storage/sessions';
 if ($savePath && is_dir($savePath)) {
     $sessFiles = glob($savePath . '/sess_*');
     if ($sessFiles) {

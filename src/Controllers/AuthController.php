@@ -10,6 +10,8 @@ class AuthController
 {
     private const MAX_FAILED_LOGINS = 5;
     private const LOGIN_LOCKOUT_SECONDS = 900;
+    /** bcrypt hash of a random string, checked when the username does not exist (equal timing) */
+    private const DUMMY_PASSWORD_HASH = '$2y$10$BPMOzCn8Bpqa26Bs1ywqC.3SGE.UKcVnfSlh.L8vhen/Wl6SmNCD6';
 
     /**
      * Show the login form.
@@ -35,7 +37,11 @@ class AuthController
         ]);
 
         if (!empty($errors)) {
-            $_SESSION['error'] = implode("<br>", $errors);
+            // The form labels the "email" field "Username"
+            if (isset($errors['email'])) {
+                $errors['email'] = 'Username is required.';
+            }
+            $_SESSION['error'] = implode(' ', $errors);
             $_SESSION['field_errors'] = $errors;
             $old = $_POST;
             unset($old['password']);
@@ -58,11 +64,15 @@ class AuthController
         }
 
         $db = Database::getInstance();
-        $stmt = $db->query("SELECT * FROM users WHERE email = :email LIMIT 1", [':email' => $email]);
+        $stmt = $db->query("SELECT * FROM users WHERE email = :email AND deactivated_at IS NULL LIMIT 1", [':email' => $email]);
         $user = $stmt->fetch();
 
+        // Always run one bcrypt check, so response time does not reveal whether the username exists
+        $passwordHash = $user['password'] ?? self::DUMMY_PASSWORD_HASH;
+        $passwordOk = password_verify($password, $passwordHash);
+
         // Verify the user exists and the password is correct
-        if ($user && password_verify($password, $user['password'])) {
+        if ($user && $passwordOk) {
             RateLimiter::clear($throttleKey);
 
             // Success! Store user details in session

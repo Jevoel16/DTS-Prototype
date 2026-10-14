@@ -59,7 +59,7 @@ Reasons for the rewrite:
 ## Key Features
 
 ### Document workflow
-- **Guest submission and tracking.** Citizens submit documents without an account and receive a tracking code (`DEPED-` followed by 10 hex characters) and a printable PDF tracking form with a QR code. They can track several codes at once.
+- **Guest submission and tracking.** Citizens submit documents without an account and receive a tracking code (`DEPED-` followed by 12 hex characters) and a printable PDF tracking form with a QR code. They can track several codes at once.
 - **Purpose-based routing.** Each document purpose has a suggested department route that the Records Officer can reorder or adjust before finalizing. Purposes marked "Others" are routed manually by the officer.
 - **Department workflow.** Documents move through `pending → in_transit → processing → … → ready_for_release → completed`, with `declined` and `frozen` as exceptional states. Departments receive and process documents in route order; the Records Office releases them. Every step is confirmed with the user's signing PIN.
 - **QR code scanning.** Officers and staff receive documents by scanning the tracking form with a device camera.
@@ -74,7 +74,7 @@ Reasons for the rewrite:
 - **Dashboards.** Admin charts for load, throughput, decline trends, bottleneck hotspots, and peak hours, plus live database performance telemetry. Staff and officers get department-level statistics.
 - **Reports.** Officers and staff queue XLSX reports of released documents. Finished reports stay under **Past Reports** for re-download.
 - **Notifications.** In-app notification bell for report completion and workflow events, polled every 30 seconds.
-- **Backups.** One-click `mysqldump` backups, compressed to ZIP, with download, restore, and delete.
+- **Backups.** One-click `mysqldump` backups, compressed to ZIP, with download, restore, and delete. Restore and delete require the admin's PIN; every restore first saves a `pre-restore` backup and is recorded in `storage/logs/system-audit.log`. `BACKUP_KEEP` limits how many backups are kept.
 - **Performance.** Cursor-based pagination, a 55-second per-user HTML response cache, and PJAX navigation. See [Caching & PJAX Explained](documentation/CACHING_AND_PJAX_EXPLAINED.md).
 
 ---
@@ -116,8 +116,7 @@ flowchart LR
 
 | Interval | Task |
 | :--- | :--- |
-| 5 minutes | Database telemetry sampling |
-| 30 minutes | Department metrics backfill (last 2 days) |
+| 5 minutes | Database telemetry sampling, department metrics backfill (last 2 days), moving abandoned jobs (reserved over 30 minutes) to failed jobs |
 | Hourly | Response-cache garbage collection, log rotation |
 | Daily | Metrics rollup, expiry of stale pending documents |
 
@@ -148,15 +147,16 @@ For full details, see [ARCHITECTURE.md](documentation/ARCHITECTURE.md).
 | :--- | :--- |
 | **Tamper evidence** | Each log entry stores a SHA-256 hash of the document's state together with the previous entry's hash. Changing any past record breaks every hash after it. |
 | **Keyed seal** | Each entry's hash is also sealed with an HMAC using `APP_INTEGRITY_KEY`, which lives only in `.env`. Someone with database access alone can recompute SHA-256 hashes but cannot produce valid seals. |
-| **Non-repudiation** | Each entry is signed with the acting user's Ed25519 private key and verified against that user's public key. A blank or missing signature on any entry counts as tampering. |
+| **Chain seal** | Each document also carries a keyed seal over its workflow state (status, current step and holder, decline reason, releaser) and the head of its log chain (newest entry and entry count). Changing a document's status, skipping a step, or deleting its newest log entries is therefore detected too. |
+| **Non-repudiation** | Each entry is signed with the acting user's Ed25519 private key and verified against that user's public key. System entries are signed with an HMAC under `APP_INTEGRITY_KEY`. A blank or missing signature on any entry counts as tampering. Users are deactivated, never deleted, so their signatures stay verifiable. |
 | **Key protection** | Private keys are encrypted at rest with authenticated encryption (`sodium_crypto_secretbox`) under a key derived from the user's signing PIN (Argon2id). The PIN is set at first login, is at least 8 characters, and is never stored. Older keys are re-encrypted automatically on their next use. |
 | **Brute force** | 5 failed sign-ins per account and IP, or 5 wrong PINs per user, lock for 15 minutes. Guest submissions, tracking lookups and PDF generation are rate-limited per IP. |
-| **Authentication** | Passwords are hashed with PHP's `password_hash`. The session ID is regenerated at login, and session cookies are `HttpOnly`, `SameSite=Strict`, and `Secure` in production. Sessions expire after 30 minutes idle or 8 hours total. Role and account status are re-checked on every request. |
+| **Authentication** | Passwords are hashed with PHP's `password_hash`. The session ID is regenerated at login, and session cookies are `HttpOnly`, `SameSite=Strict`, and `Secure` in production. Sessions expire after 30 minutes idle or 8 hours total. Role and account status are re-checked on every request. Seeded accounts and passwords set by an admin are temporary: the user must choose a new one (at least 10 characters) at the next sign-in. Session files live in `storage/sessions`. |
 | **Authorization** | Staff can only open documents routed through their department. Report downloads are limited to the user who generated them. |
 | **Request forgery** | Every state-changing request requires a CSRF token. Redirects only go to same-site paths. |
 | **HTTP hardening** | NGINX sends HSTS, CSP, `X-Frame-Options`, `nosniff` and `Referrer-Policy`, and hides its version. |
 | **Concurrency** | Optimistic locking with row versions inside PDO transactions. |
-| **Incident response** | Automatic freeze on detected tampering, plus admin-initiated **Freeze All**, and a PIN-signed **Rebuild Chain**. A database restore also requires the admin's PIN. |
+| **Incident response** | Automatic freeze on detected tampering, plus admin-initiated **Freeze All**, and a PIN-signed **Rebuild Chain** (refused for entries whose signature does not verify). **Auto-resolve** only restores from a snapshot that verifies against the sealed chain. A database restore also requires the admin's PIN. |
 
 A tampering demo is included: `composer run corrupt` modifies a document directly in the database so you can watch detection and the automatic freeze happen. See also the [Layman Guide to Hash Verification](documentation/HASH_VERIFICATION_LAYMAN_GUIDE.md) and [Quantum Safety](documentation/QUANTUM_SAFETY.md).
 
@@ -208,34 +208,36 @@ More screenshots are in [documentation/screenshots/](documentation/screenshots/)
    ```bash
    composer run seed:prod
    ```
-   > **Warning:** `seed:prod` drops and recreates all tables. Do not run it against a database you want to keep.
+   > **Warning:** `seed:prod` drops and recreates all tables. It refuses to run on a database that already holds DTS tables unless you add `-- --force`.
 
 4. **Start the server and background worker**
    ```bash
    composer run dev
    ```
 
-5. **Open the application** at **https://localhost:8000** with NGINX (accept the self-signed certificate warning), or **http://localhost:8000** with the built-in server fallback. Sign in with one of the [default accounts](#default-test-accounts). Each user sets a signing PIN of at least 8 characters on first login.
+5. **Open the application** at **https://localhost:8000** with NGINX (accept the self-signed certificate warning), or **http://localhost:8000** with the built-in server fallback. Sign in with one of the [default accounts](#default-test-accounts). On first sign-in each user must replace the default password, then sets a signing PIN of at least 8 characters.
 
 ### Upgrading an existing installation
 
-Databases created before October 2026 need a one-time schema upgrade. It adds new indexes, the `rate_limits` table and the `document_logs.seal` column, and drops unused Laravel tables. It is safe to run more than once:
+Existing databases need a schema upgrade. It adds new indexes, the `rate_limits` table, the `document_logs.seal` and `documents.chain_seal` columns and the `users.deactivated_at` / `must_change_password` columns, switches the user foreign keys of the log and key-history tables to `ON DELETE RESTRICT`, flags accounts that still use the default password, and drops unused Laravel tables. Take a backup first. It is safe to run more than once:
 
 ```bash
 composer run migrate
 ```
 
-Then set `APP_INTEGRITY_KEY` in `.env` and seal the existing logs once. Documents whose chain is already broken are listed instead of being sealed:
+Then make sure `APP_INTEGRITY_KEY` is set in `.env` and seal the existing logs and documents once. Documents whose chain is already broken, or whose data no longer matches their newest log entry, are listed instead of being sealed. Each document's workflow state at this moment becomes its sealed baseline:
 
 ```bash
 composer run seal
 ```
 
-> **Important:** Once a key is set, unsealed logs count as tampered, so run `composer run seal` straight after setting it. Keep a copy of the key off the server.
+> **Important:** Once a key is set, unsealed logs and documents without a chain seal count as tampered, so run `composer run seal` straight after migrating or setting the key. Keep a copy of the key off the server.
+>
+> Sessions now live in `storage/sessions`, so everyone signs in again once after upgrading. On Linux, make sure the PHP-FPM user can write to `storage/sessions` and `storage/logs`.
 
 ### Before going online
 
-- Set `APP_ENV=production`, `APP_URL`, `APP_INTEGRITY_KEY` and `BACKUP_PASSWORD` in `.env`, and keep the key and password somewhere off the server.
+- Set `APP_ENV=production`, `APP_URL`, `APP_INTEGRITY_KEY` (64 random hex characters) and `BACKUP_PASSWORD` in `.env`, and keep the key and password somewhere off the server. Set `BACKUP_KEEP` and copy backups off the server regularly.
 - Use a dedicated MySQL account with only `SELECT, INSERT, UPDATE, DELETE` rights for the app (see `.env.example`), and keep MySQL bound to `127.0.0.1`.
 - Use a real domain with a trusted certificate (for example a named Cloudflare Tunnel or Let's Encrypt) instead of the self-signed one and the quick tunnel.
 - Run the worker under systemd or Supervisor (`composer run prod -- --no-worker`).
@@ -257,6 +259,7 @@ All settings are read from `.env` in the project root. The `DB_*` and `APP_DEBUG
 | `APP_ENV` | `local` | `production` forces `Secure` session cookies and blocks the seeders, `corrupt.php` and `concurrency_test.php`. |
 | `APP_INTEGRITY_KEY` | *(empty)* | Secret that seals the hash chain. Generate it with `php -r "echo bin2hex(random_bytes(32));"`, then run `composer run seal`. |
 | `BACKUP_PASSWORD` | *(empty)* | Encrypts backup zips with AES-256. Backups can't be restored without it. |
+| `BACKUP_KEEP` | `0` | Number of newest backup zips to keep; older ones are deleted after each new backup. `0` keeps all. |
 | `TRUSTED_PROXIES` | *(empty)* | Proxy IPs allowed to report the client IP. Not needed under the bundled NGINX config. |
 | `NGINX_PATH` | `C:\nginx` | *Windows only.* Path to `nginx.exe` or its folder (falls back to `PATH`) |
 | `OPENSSL_PATH` | *(auto)* | *Windows only.* Path to `openssl.exe` or its folder (falls back to `PATH`, then Git for Windows' bundled copy) |
@@ -316,7 +319,7 @@ Generated files live in git-ignored folders and are rebuilt on each start, so a 
 | `php scripts/generate-keys.php` | Generates missing Ed25519 keypairs for users. |
 | `composer run seal` | Seals unsealed hash-chain logs with `APP_INTEGRITY_KEY` ([scripts/seal-logs.php](scripts/seal-logs.php)). The seeders run it automatically. |
 | `composer run corrupt` | Tampers with a document ([scripts/corrupt.php](scripts/corrupt.php)) to demonstrate tamper detection and the automatic freeze. |
-| `php scripts/concurrency_test.php` | Simulates concurrent updates to one document to exercise optimistic locking. |
+| `php scripts/concurrency_test.php <document_id> <PIN> [workers]` | Starts several processes that complete the same task at the same moment (Windows and Linux) and checks that exactly one succeeds. The document must be `processing`; the PIN is the signing PIN of a user in the department holding the step. |
 
 ---
 
@@ -326,7 +329,7 @@ Seeders live in [scripts/seeders/](scripts/seeders/).
 
 | Command | Description |
 | :--- | :--- |
-| `composer run seed:prod` | [setup-production-db.js](scripts/seeders/setup-production-db.js). **Drops and recreates all tables**, then seeds departments, purposes, and the default accounts. |
+| `composer run seed:prod` | [setup-production-db.js](scripts/seeders/setup-production-db.js). **Drops and recreates all tables**, then seeds departments, purposes, and the default accounts. Refuses an existing DTS database unless run as `composer run seed:prod -- --force`. |
 | `composer run seed:fast [docs]` | [fast-seed.php](scripts/seeders/fast-seed.php). Clears documents and logs, then inserts `docs` simulated documents (default 10,000) with valid signed hash chains directly in MySQL. |
 | `composer run seed:dev [docs] [chunk] [concurrency]` | [seed.js](scripts/seeders/seed.js). Drives the running web server over HTTP to simulate many concurrent users; doubles as a load and concurrency test. Uses `APP_URL`. |
 | `composer run seed:legacy [-- file.csv]` | [import-legacy.php](scripts/seeders/import-legacy.php). Imports real routing records from the previous DTS (see below). |
@@ -402,7 +405,7 @@ DTS-Prototype/
 
 ## Default Test Accounts
 
-All seeded accounts use the password **`password`**.
+All seeded accounts use the password **`password`**, and must replace it at first sign-in.
 
 > **Important:** These credentials are for development and evaluation only. Change every password before deploying to a shared or production environment.
 

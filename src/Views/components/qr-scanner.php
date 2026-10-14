@@ -26,7 +26,7 @@ $finderInputName = $finderInputName ?? 'tracking_code';
             <div>
                 <label for="<?= htmlspecialchars($finderInputName) ?>" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tracking Code</label>
                 <div class="mt-1 flex rounded-md shadow-sm">
-                    <input type="text" name="<?= htmlspecialchars($finderInputName) ?>" id="<?= htmlspecialchars($finderInputName) ?>" class="block w-full rounded-none rounded-l-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-accent-1 focus:ring-accent-1 sm:text-sm p-2 border" placeholder="DEPED-XXXXXXXXXX" required>
+                    <input type="text" name="<?= htmlspecialchars($finderInputName) ?>" id="<?= htmlspecialchars($finderInputName) ?>" class="block w-full rounded-none rounded-l-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:border-accent-1 focus:ring-accent-1 sm:text-sm p-2 border" placeholder="DEPED-XXXXXXXXXXXX" required>
                     <button type="submit" class="relative -ml-px inline-flex items-center space-x-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-accent-2 focus:border-accent-1 focus:outline-none focus:ring-1 focus:ring-accent-1 transition">
                         <span><?= htmlspecialchars($finderButtonText) ?></span>
                     </button>

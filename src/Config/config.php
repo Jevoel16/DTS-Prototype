@@ -17,7 +17,7 @@ if (file_exists($envPath)) {
 }
 
 // Real environment variables (systemd, CI, one-off CLI runs) override .env
-foreach (['DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'APP_DEBUG', 'APP_ENV', 'APP_URL', 'APP_INTEGRITY_KEY', 'TRUSTED_PROXIES', 'BACKUP_PASSWORD'] as $key) {
+foreach (['DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'APP_DEBUG', 'APP_ENV', 'APP_URL', 'APP_INTEGRITY_KEY', 'TRUSTED_PROXIES', 'BACKUP_PASSWORD', 'BACKUP_KEEP'] as $key) {
     $value = getenv($key);
     if ($value !== false) {
         $env[$key] = $value;
@@ -38,6 +38,8 @@ return [
         'trusted_proxies' => array_filter(array_map('trim', explode(',', $env['TRUSTED_PROXIES'] ?? ''))),
         // Encrypts backup zips (AES-256). Store it outside the server too: without it backups cannot be restored
         'backup_password' => $env['BACKUP_PASSWORD'] ?? '',
+        // Number of newest backup zips to keep; older ones are deleted after each new backup (0 = keep all)
+        'backup_keep' => (int) ($env['BACKUP_KEEP'] ?? 0),
     ],
     'database' => [
         'host' => $env['DB_HOST'],

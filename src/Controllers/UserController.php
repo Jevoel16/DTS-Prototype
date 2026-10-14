@@ -20,9 +20,17 @@ class UserController
             $params[':search'] = '%' . $_GET['search'] . '%';
         }
         
-        if (!empty($_GET['role'])) {
+        if (!empty($_GET['role']) && $_GET['role'] !== 'all') {
             $where[] = "role = :role";
             $params[':role'] = $_GET['role'];
+        }
+
+        // Deactivated accounts are hidden unless asked for (?status=deactivated or ?status=all)
+        $status = $_GET['status'] ?? 'active';
+        if ($status === 'deactivated') {
+            $where[] = "deactivated_at IS NOT NULL";
+        } elseif ($status !== 'all') {
+            $where[] = "deactivated_at IS NULL";
         }
         
         $whereSql = count($where) > 0 ? "WHERE " . implode(' AND ', $where) : "";
@@ -33,7 +41,7 @@ class UserController
         
         $paginator = new \App\Utils\Paginator($totalItems, 15, $page, '?page=(:num)&' . http_build_query(array_diff_key($_GET, ['page' => ''])));
         
-        $sql = "SELECT id, name, email, role, department_id, created_at, public_key FROM users $whereSql ORDER BY name ASC LIMIT {$paginator->getLimit()} OFFSET {$paginator->getOffset()}";
+        $sql = "SELECT id, name, email, role, department_id, created_at, public_key, deactivated_at FROM users $whereSql ORDER BY name ASC LIMIT {$paginator->getLimit()} OFFSET {$paginator->getOffset()}";
         $stmt = $db->query($sql, $params);
         $users = $stmt->fetchAll();
         
@@ -58,7 +66,7 @@ class UserController
         ]);
 
         if (!empty($errors)) {
-            $_SESSION['error'] = implode("<br>", $errors);
+            $_SESSION['error'] = implode(' ', $errors);
             header("Location: /users/create");
             exit;
         }
@@ -85,16 +93,25 @@ class UserController
             exit;
         }
 
+        [$departmentError, $departmentId] = $this->resolveDepartment($role, $_POST['department_id'] ?? '');
+        if ($departmentError) {
+            $_SESSION['error'] = $departmentError;
+            header('Location: /users/create');
+            exit;
+        }
+
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-        
-        $sql = "INSERT INTO users (name, email, password, role, department_id, created_at, updated_at) 
-                VALUES (:name, :email, :password, :role, NULL, NOW(), NOW())";
-                
+
+        // The admin-chosen password is temporary: the user replaces it at first sign-in
+        $sql = "INSERT INTO users (name, email, password, role, department_id, must_change_password, created_at, updated_at)
+                VALUES (:name, :email, :password, :role, :department_id, 1, NOW(), NOW())";
+
         $db->query($sql, [
             ':name' => $name,
             ':email' => $email,
             ':password' => $hashedPassword,
-            ':role' => $role
+            ':role' => $role,
+            ':department_id' => $departmentId
         ]);
 
         $_SESSION['success'] = 'User created successfully.';
@@ -128,7 +145,7 @@ class UserController
         ]);
 
         if (!empty($errors)) {
-            $_SESSION['error'] = implode("<br>", $errors);
+            $_SESSION['error'] = implode(' ', $errors);
             header("Location: /users/{$id}/edit");
             exit;
         }
@@ -166,22 +183,33 @@ class UserController
             exit;
         }
 
+        [$departmentError, $departmentId] = $this->resolveDepartment($role, $_POST['department_id'] ?? '');
+        if ($departmentError) {
+            $_SESSION['error'] = $departmentError;
+            header("Location: /users/{$id}/edit");
+            exit;
+        }
+
         if (!empty($password)) {
             $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-            $sql = "UPDATE users SET name = :name, email = :email, role = :role, password = :password, updated_at = NOW() WHERE id = :id";
+            // A password set by an admin for someone else is temporary and must be replaced at next sign-in
+            $sql = "UPDATE users SET name = :name, email = :email, role = :role, department_id = :department_id, password = :password, must_change_password = :must_change, updated_at = NOW() WHERE id = :id";
             $params = [
                 ':name' => $name,
                 ':email' => $email,
                 ':role' => $role,
+                ':department_id' => $departmentId,
                 ':password' => $hashedPassword,
+                ':must_change' => ((int) $id !== (int) $_SESSION['user_id']) ? 1 : 0,
                 ':id' => $id
             ];
         } else {
-            $sql = "UPDATE users SET name = :name, email = :email, role = :role, updated_at = NOW() WHERE id = :id";
+            $sql = "UPDATE users SET name = :name, email = :email, role = :role, department_id = :department_id, updated_at = NOW() WHERE id = :id";
             $params = [
                 ':name' => $name,
                 ':email' => $email,
                 ':role' => $role,
+                ':department_id' => $departmentId,
                 ':id' => $id
             ];
         }
@@ -203,11 +231,36 @@ class UserController
         }
 
         $db = Database::getInstance();
-        $db->query("DELETE FROM users WHERE id = :id", [':id' => $id]);
-        
-        $_SESSION['success'] = 'User deleted successfully.';
+        // Accounts are deactivated, never deleted: their signed log entries and key history must
+        // stay attributable and verifiable. AuthMiddleware ends a deactivated user's sessions.
+        $db->query("UPDATE users SET deactivated_at = NOW(), updated_at = NOW() WHERE id = :id AND deactivated_at IS NULL", [':id' => $id]);
+
+        $_SESSION['success'] = 'User deactivated. Their history is kept and they can no longer sign in.';
         header('Location: /users');
         exit;
+    }
+
+    /**
+     * Staff need a department and Records Officers the Records Unit, since routing and
+     * permissions match on it; admins have none.
+     *
+     * @return array{0: ?string, 1: ?int} [error message, department ID]
+     */
+    private function resolveDepartment(string $role, $departmentInput): array
+    {
+        if ($role === 'admin') {
+            return [null, null];
+        }
+        $department = ctype_digit((string) $departmentInput)
+            ? Database::getInstance()->query("SELECT id, name FROM departments WHERE id = :id", [':id' => (int) $departmentInput])->fetch()
+            : null;
+        if (!$department) {
+            return ['Please choose a department for this account.', null];
+        }
+        if ($role === 'officer' && $department['name'] !== 'Records Unit') {
+            return ['Records Officers must belong to the Records Unit.', null];
+        }
+        return [null, (int) $department['id']];
     }
 
     public function resetSignature($id)

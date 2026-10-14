@@ -16,8 +16,13 @@ class CacheMiddleware
             return;
         }
 
+        // Only bare URLs are cached. Keying on arbitrary query strings let anyone create an
+        // unbounded number of cache files (/?x=1, /?x=2, ...) and fill the disk.
+        if (($_SERVER['QUERY_STRING'] ?? '') !== '' || str_contains($_SERVER['REQUEST_URI'] ?? '', '?')) {
+            return;
+        }
+
         $ttl = (int)$ttl;
-        // Include query parameters in URI
         $requestUri = $_SERVER['REQUEST_URI'];
         
         $userId = $_SESSION['user_id'] ?? 'guest';

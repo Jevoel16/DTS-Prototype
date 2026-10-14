@@ -154,7 +154,7 @@ class SystemHealthController
             $log['document_state_hash'],
             $log['signature']
         ];
-        $recalculatedHash = hash('sha256', json_encode($dataToHash, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $recalculatedHash = IntegrityManager::computeBlockHash($log, $previousHash);
 
         header('Content-Type: application/json');
         echo json_encode([
@@ -279,6 +279,27 @@ class SystemHealthController
             ])->fetch();
 
             $previousHash = $lastValidLog ? $lastValidLog['hash'] : 'genesis_hash';
+
+            // Re-sealing makes entries valid again, so only rebuild entries that can prove their origin:
+            // a valid user or keyed-system signature. A legacy (unkeyed) system entry must still carry a
+            // valid seal, because anyone with database access could write one.
+            $unverifiable = [];
+            foreach ($logsToRebuild as $log) {
+                $signatureOk = IntegrityManager::verifySignature($log);
+                if (!$signatureOk || (IntegrityManager::isLegacySystemSignature($log) && !IntegrityManager::verifySeal($log))) {
+                    $unverifiable[] = (int) $log['id'];
+                }
+            }
+            if ($unverifiable) {
+                throw new \Exception("Rebuild refused: log ID(s) " . implode(', ', $unverifiable) . " cannot prove their origin (invalid signature, or an unsealed legacy system entry), so their content cannot be trusted. Investigate them instead of re-sealing.");
+            }
+
+            // The live metadata must also match the newest entry, or the rebuild would bless altered data
+            $currentDocument = $db->query("SELECT * FROM documents WHERE id = :id", ['id' => $documentId])->fetch();
+            $newestLog = end($logsToRebuild);
+            if (!$currentDocument || !IntegrityManager::stateHashMatches($currentDocument, $newestLog['document_state_hash'] ?? null)) {
+                throw new \Exception("Rebuild refused: the document's current data does not match its newest log entry. Use Auto-resolve to restore the verified data first.");
+            }
 
             foreach ($logsToRebuild as $log) {
                 $newHash = IntegrityManager::computeBlockHash($log, $previousHash);
@@ -454,17 +475,46 @@ class SystemHealthController
             }
         }
 
+        if (empty($trackingCodesToFreeze)) {
+            $_SESSION['info'] = "The last integrity check found no documents to freeze.";
+            header("Location: /system-overview");
+            exit;
+        }
+
+        // Check the PIN once up front, so a wrong or locked PIN is reported instead of
+        // silently failing every document
+        try {
+            IntegrityManager::signAction((int) $currentUser->id, $pin, 'ADMIN: Freeze all flagged documents', hash('sha256', implode(',', array_keys($trackingCodesToFreeze))));
+        } catch (\Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
+            header("Location: /system-overview");
+            exit;
+        }
+
         $frozenCount = 0;
+        $alreadyFrozen = 0;
+        $failed = [];
         foreach (array_keys($trackingCodesToFreeze) as $code) {
+            $status = $db->query("SELECT status FROM documents WHERE tracking_code = :tc", [':tc' => $code])->fetch()['status'] ?? null;
+            if ($status === 'frozen') {
+                $alreadyFrozen++;
+                continue;
+            }
             try {
                 $workflow->freezeDocument($code, $currentUser, $pin);
                 $frozenCount++;
             } catch (\Exception $e) {
-                // Ignore if it's already frozen or if permission issues arise
+                $failed[] = $code;
+                error_log("Freeze All: could not freeze {$code}: " . $e->getMessage());
             }
         }
-        
-        $_SESSION['success'] = "Successfully frozen $frozenCount documents with integrity issues.";
+
+        $message = "Froze {$frozenCount} document(s) with integrity issues" . ($alreadyFrozen ? "; {$alreadyFrozen} were already frozen" : "") . ".";
+        if ($failed) {
+            $_SESSION['error'] = $message . " Could not freeze: " . implode(', ', array_slice($failed, 0, 10)) . (count($failed) > 10 ? ', ...' : '') . ".";
+        } else {
+            $_SESSION['success'] = $message;
+        }
         header("Location: /system-overview");
         exit;
     }

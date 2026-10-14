@@ -60,7 +60,7 @@ class GuestController
         }
 
         if (!empty($errors)) {
-            $_SESSION['error'] = implode("<br>", $errors);
+            $_SESSION['error'] = implode(' ', $errors);
             $_SESSION['field_errors'] = $errors;
             $_SESSION['old'] = $_POST;
             header("Location: /");

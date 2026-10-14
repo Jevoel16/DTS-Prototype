@@ -138,9 +138,7 @@ class Router
 
     private function abort(int $code = 404): void
     {
-        http_response_code($code);
-        echo "404 Not Found";
-        exit;
+        render_error_page($code, 'Page not found', 'The page you are looking for does not exist or has moved.');
     }
 }
 

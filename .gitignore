@@ -16,6 +16,7 @@ node_modules/
 /storage/app/
 /storage/nginx/
 /storage/ssl/
+/storage/sessions/
 *.log
 /temp
 *.xlsx
@@ -49,3 +50,4 @@ docs/
 
 # --- Thesis paper: private references & templates ---
 paper/*
+AUDIT_REPORT_2026-10.md

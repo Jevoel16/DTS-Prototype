@@ -27,7 +27,7 @@
                             $log['prev_hash_html'] = sprintf(
                                 '<div class="flex items-start justify-between gap-1 group">
                                     <span id="prev-hash-%s" class="font-mono break-all text-gray-500 dark:text-gray-400" title="%s">%s</span>
-                                    <button data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none shrink-0 mt-0.5" title="Copy Previous Hash">
+                                    <button type="button" aria-label="Copy to clipboard" data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none shrink-0 mt-0.5" title="Copy Previous Hash">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
@@ -52,7 +52,7 @@
                             $log['curr_hash_html'] = sprintf(
                                 '<div class="flex items-start justify-between gap-1 group">
                                     <span id="curr-hash-%s" class="font-mono break-all text-gray-500 dark:text-gray-400" title="%s">%s</span>
-                                    <button data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none shrink-0 mt-0.5" title="Copy Current Hash">
+                                    <button type="button" aria-label="Copy to clipboard" data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none shrink-0 mt-0.5" title="Copy Current Hash">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>

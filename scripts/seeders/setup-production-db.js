@@ -2,15 +2,14 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 const mysql = require('mysql2/promise');
 const fs = require('fs');
-const os = require('os');
 
 function clearSessionsAndCache() {
+    // Only this app's session folder (see public/index.php), never the shared OS temp folder
+    const sessionDir = path.join(__dirname, '../../storage/sessions');
     try {
-        const tmpDir = os.tmpdir();
-        const files = fs.readdirSync(tmpDir);
-        for (const file of files) {
+        for (const file of fs.readdirSync(sessionDir)) {
             if (file.startsWith('sess_')) {
-                try { fs.unlinkSync(path.join(tmpDir, file)); } catch (e) {}
+                try { fs.unlinkSync(path.join(sessionDir, file)); } catch (e) {}
             }
         }
     } catch (e) {}
@@ -43,6 +42,20 @@ async function setupDatabase() {
         const dbName = connection.escapeId(process.env.DB_DATABASE);
         await connection.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`);
         await connection.query(`USE ${dbName}`);
+
+        // database.sql drops every table. Refuse to wipe a database that already holds data
+        // unless the operator explicitly passes --force.
+        const [existing] = await connection.query(
+            "SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('users', 'documents')"
+        );
+        if (existing[0].c > 0 && !process.argv.includes('--force')) {
+            const [[{ users }]] = await connection.query('SELECT COUNT(*) AS users FROM users').catch(() => [[{ users: '?' }]]);
+            console.error(`
+⛔ ${process.env.DB_DATABASE} already contains DTS tables (${users} user account(s)).`);
+            console.error('   This setup DROPS and recreates every table. To really wipe it, run:');
+            console.error('   composer run seed:prod -- --force');
+            process.exit(1);
+        }
 
         const sqlFilePath = path.join(__dirname, '../../database.sql');
         const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
@@ -224,12 +237,12 @@ async function setupDatabase() {
         }
 
         // 4. Seed Users
-        // PHP password_hash() uses bcrypt. We will use a pre-hashed string for 'password'
+        // PHP password_hash() uses bcrypt. Pre-hashed 'password'; every account must replace it at first sign-in
         const hashedPassword = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
         
         // Admin User
         await connection.query(
-            "INSERT INTO users (name, email, password, role, created_at, updated_at) VALUES (?, ?, ?, 'admin', NOW(), NOW())",
+            "INSERT INTO users (name, email, password, role, must_change_password, created_at, updated_at) VALUES (?, ?, ?, 'admin', 1, NOW(), NOW())",
             ['Admin User', 'admin.ict.dts', hashedPassword]
         );
 
@@ -248,12 +261,12 @@ async function setupDatabase() {
             const slug = deptSlug(dept.name);
             if (dept.name === 'Records Unit') {
                 await connection.query(
-                    "INSERT INTO users (name, email, password, department_id, role, created_at, updated_at) VALUES (?, ?, ?, ?, 'officer', NOW(), NOW())",
+                    "INSERT INTO users (name, email, password, department_id, role, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, 'officer', 1, NOW(), NOW())",
                     ['Records Officer', `officer.${slug}.dts`, hashedPassword, dept.id]
                 );
             } else {
                 await connection.query(
-                    "INSERT INTO users (name, email, password, department_id, role, created_at, updated_at) VALUES (?, ?, ?, ?, 'staff', NOW(), NOW())",
+                    "INSERT INTO users (name, email, password, department_id, role, must_change_password, created_at, updated_at) VALUES (?, ?, ?, ?, 'staff', 1, NOW(), NOW())",
                     [`${dept.name} Staff`, `staff.${slug}.dts`, hashedPassword, dept.id]
                 );
             }

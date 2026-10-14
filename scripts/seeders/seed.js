@@ -775,13 +775,16 @@ async function seed() {
         await connection.query('TRUNCATE TABLE cache');
         await connection.query('TRUNCATE TABLE user_public_key_histories');
         await connection.query('SET FOREIGN_KEY_CHECKS = 1');
+        // The seeder drives the app with the default password, so lift the forced change while it runs
+        await connection.query('UPDATE users SET must_change_password = 0');
 
         console.log('🧹 Cleaning file caches and active PHP session files...');
         const cacheDir = path.join(__dirname, '../../cache');
         if (fs.existsSync(cacheDir)) {
             try {
                 const { execSync } = require('child_process');
-                execSync(`rm -rf "${cacheDir}/data"/* "${cacheDir}/responses"/* "${cacheDir}"/*.json /tmp/sess_*`, { stdio: 'ignore' });
+                const sessionDir = path.join(__dirname, '../../storage/sessions');
+                execSync(`rm -rf "${cacheDir}/data"/* "${cacheDir}/responses"/* "${cacheDir}"/*.json "${sessionDir}"/sess_*`, { stdio: 'ignore' });
             } catch (e) {
                 console.log('⚠️ Minor issue clearing file cache directory, proceeding anyway.');
             }
@@ -876,6 +879,8 @@ async function seed() {
         console.log('🔒 Resetting all digital signatures for first-time login...');
         await connection.query("UPDATE user_public_key_histories SET activated_at = '2020-01-01 00:00:00', deactivated_at = NOW(), updated_at = NOW() WHERE deactivated_at IS NULL");
         await connection.query("UPDATE users SET public_key = NULL, private_key = NULL, security_key_set_at = NULL");
+        // Seeded accounts still use the default password: require a new one at first sign-in
+        await connection.query('UPDATE users SET must_change_password = 1');
 
         const endTime = Date.now();
         const elapsedSeconds = Math.floor((endTime - startTime) / 1000);

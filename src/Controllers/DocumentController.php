@@ -22,9 +22,7 @@ class DocumentController
         $document = $service->findByTrackingCode($tracking_code, 'ASC');
 
         if (!$document) {
-            header("HTTP/1.0 404 Not Found");
-            echo "Document not found.";
-            exit;
+            render_error_page(404, 'Document not found', 'No document matches that tracking code.');
         }
 
         $this->authorizeView($document);
@@ -53,9 +51,7 @@ class DocumentController
         $document = $service->findByTrackingCode($tracking_code, 'ASC');
 
         if (!$document) {
-            header("HTTP/1.0 404 Not Found");
-            echo "Document not found.";
-            exit;
+            render_error_page(404, 'Document not found', 'No document matches that tracking code.');
         }
 
         $this->authorizeView($document);
@@ -83,7 +79,7 @@ class DocumentController
         $document = $stmt->fetch();
 
         if (!$document) {
-            $_SESSION['error'] = "Document " . htmlspecialchars($trackingCode) . " not found.";
+            $_SESSION['error'] = "Document {$trackingCode} not found.";
             header("Location: /intake");
             exit;
         }
@@ -312,9 +308,7 @@ class DocumentController
         // Logged-in users, or the guest who submitted this document in the current session
         $submittedCodes = $_SESSION['submitted_codes'] ?? [];
         if (!isset($_SESSION['user_id']) && !in_array($tracking_code, $submittedCodes, true)) {
-            http_response_code(403);
-            echo "403 Forbidden: Please sign in to print this tracking form.";
-            exit;
+            render_error_page(403, 'Sign in required', 'Please sign in to print this tracking form.');
         }
 
         $db = Database::getInstance();
@@ -326,9 +320,12 @@ class DocumentController
         $document = $stmt->fetch();
 
         if (!$document) {
-            header("HTTP/1.0 404 Not Found");
-            echo "Document not found.";
-            exit;
+            render_error_page(404, 'Document not found', 'No document matches that tracking code.');
+        }
+
+        // Signed-in users get the same per-department restriction as the document page
+        if (isset($_SESSION['user_id']) && !in_array($tracking_code, $submittedCodes, true)) {
+            $this->authorizeView($document);
         }
 
         // Generate QR Code
@@ -369,9 +366,7 @@ class DocumentController
     {
         $user = \App\Models\User::findById((int) $_SESSION['user_id']);
         if (!$user || !(new \App\Policies\DocumentPolicy())->view($user, $document)) {
-            http_response_code(403);
-            echo "403 Forbidden: You do not have permission to view this document.";
-            exit;
+            render_error_page(403, 'Access denied', 'This document is not routed through your department.');
         }
     }
 }

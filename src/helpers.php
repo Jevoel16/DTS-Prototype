@@ -32,6 +32,30 @@ if (!function_exists('refuse_in_production')) {
     }
 }
 
+if (!function_exists('render_error_page')) {
+    /**
+     * Send a small styled error page (403, 404, 429...) with a way back, then stop.
+     */
+    function render_error_page(int $code, string $title, string $message): never
+    {
+        http_response_code($code);
+        header('Content-Type: text/html; charset=UTF-8');
+        $home = isset($_SESSION['user_id']) ? '/dashboard' : '/';
+        echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
+            . '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            . '<title>' . e($title) . ' — DepEd DTS</title>'
+            . '<link href="/css/tailwind.css" rel="stylesheet"></head>'
+            . '<body class="font-sans antialiased bg-gray-100 text-gray-900 min-h-screen flex items-center justify-center p-4">'
+            . '<main class="bg-white shadow-sm rounded-lg p-6 sm:p-8 max-w-md w-full text-center">'
+            . '<p class="text-sm font-semibold text-gray-500">Error ' . $code . '</p>'
+            . '<h1 class="mt-2 text-2xl font-bold">' . e($title) . '</h1>'
+            . '<p class="mt-3 text-gray-600">' . e($message) . '</p>'
+            . '<a href="' . $home . '" class="mt-6 inline-block px-4 py-2 rounded-md bg-accent-1 hover:bg-accent-1-hover text-white text-sm font-semibold">Go back to the start page</a>'
+            . '</main></body></html>';
+        exit;
+    }
+}
+
 if (!function_exists('safe_back')) {
     /**
      * Redirect target for "go back": the Referer's path, but only when it points at this site.

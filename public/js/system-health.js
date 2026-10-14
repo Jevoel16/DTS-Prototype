@@ -248,14 +248,26 @@ function initSystemHealth() {
                 recalculatedHashVal.textContent = data.recalculated_hash;
                 rawDataStringVal.textContent = data.raw_data_string;
 
-                componentsBody.innerHTML = '';
+                // Values come straight from the database (which the integrity monitor treats as
+                // untrusted), so they are inserted as text, never as HTML
+                componentsBody.replaceChildren();
                 for (const [key, value] of Object.entries(data.components)) {
-                    componentsBody.innerHTML += `
-                        <tr>
-                            <td class="px-4 py-2 font-bold text-accent-1 dark:text-accent-1-hover">${key}</td>
-                            <td class="px-4 py-2 break-all dark:text-gray-300">${value === null ? '<span class="text-red-500 italic">null</span>' : value}</td>
-                        </tr>
-                    `;
+                    const row = document.createElement('tr');
+                    const keyCell = document.createElement('td');
+                    keyCell.className = 'px-4 py-2 font-bold text-accent-1 dark:text-accent-1-hover';
+                    keyCell.textContent = key;
+                    const valueCell = document.createElement('td');
+                    valueCell.className = 'px-4 py-2 break-all dark:text-gray-300';
+                    if (value === null) {
+                        const nullLabel = document.createElement('span');
+                        nullLabel.className = 'text-red-500 italic';
+                        nullLabel.textContent = 'null';
+                        valueCell.appendChild(nullLabel);
+                    } else {
+                        valueCell.textContent = String(value);
+                    }
+                    row.append(keyCell, valueCell);
+                    componentsBody.appendChild(row);
                 }
 
                 if (debugModal) {

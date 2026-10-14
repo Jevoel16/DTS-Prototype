@@ -2,8 +2,15 @@
 
 /**
  * Concurrency Test Script
- * Simulates multiple users attempting to process the same document simultaneously
- * to ensure that FOR UPDATE row-level locking handles the race condition perfectly.
+ * Simulates several users completing the same task at the same moment, to check that the
+ * optimistic lock (UPDATE ... WHERE version = :version) lets exactly one of them succeed.
+ *
+ *   php scripts/concurrency_test.php <document_id> <signing PIN> [workers=5]
+ *
+ * The document must be in `processing`; the workers act as a user of the department that
+ * holds the current step, so the PIN must be that user's signing PIN. Workers are separate
+ * PHP processes (proc_open), so this runs the same on Windows and Linux; they wait for a
+ * shared start time before acting, so their requests really overlap.
  */
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -14,12 +21,34 @@ date_default_timezone_set('Asia/Manila');
 
 use App\Core\Database;
 
-if ($argc < 2) {
-    echo "Usage: php scripts/concurrency_test.php <document_id>\n";
+// --- Worker mode: one simulated user (started by the parent below) ---------------------------
+if (($argv[1] ?? '') === '--worker') {
+    [, , $documentId, $userId, $startAt, $workerNo] = $argv;
+    $pin = getenv('DTS_TEST_PIN') ?: '';
+    try {
+        // Everything slow (DB connection, user lookup) happens before the shared start time
+        $workflow = new \App\Services\DocumentWorkflowService();
+        $user = \App\Models\User::findById((int) $userId);
+        while (microtime(true) < (float) $startAt) {
+            usleep(500);
+        }
+        $workflow->completeTask((int) $documentId, "Worker $workerNo concurrent processing test", $user, $pin);
+        echo "✅ [Worker $workerNo] SUCCESS: Task completed.\n";
+    } catch (\Throwable $e) {
+        echo "❌ [Worker $workerNo] REJECTED: " . $e->getMessage() . "\n";
+    }
+    exit(0);
+}
+
+// --- Parent mode ---------------------------------------------------------------------------
+if ($argc < 3) {
+    echo "Usage: php scripts/concurrency_test.php <document_id> <signing PIN> [workers=5]\n";
     exit(1);
 }
 
-$documentId = (int)$argv[1];
+$documentId = (int) $argv[1];
+$pin = $argv[2];
+$numWorkers = max(2, (int) ($argv[3] ?? 5));
 
 echo "🚀 Starting Concurrency Test on Document ID: $documentId\n";
 
@@ -34,76 +63,77 @@ if (!$doc) {
 echo "Current Status: {$doc['status']}\n";
 echo "Current Step: {$doc['current_step']}\n";
 
-// We will fork 5 processes to simulate 5 users clicking "Complete Task" at the exact same millisecond.
-$numWorkers = 5;
-$pids = [];
-
-echo "\nForking $numWorkers concurrent requests...\n";
-
-for ($i = 0; $i < $numWorkers; $i++) {
-    $pid = pcntl_fork();
-    if ($pid == -1) {
-        die('Could not fork');
-    } else if ($pid) {
-        // Parent
-        $pids[] = $pid;
-    } else {
-        // Child process
-        try {
-            // Force a new database connection for each child to simulate separate HTTP requests
-            // By resetting the Singleton instance using Reflection
-            $reflection = new \ReflectionClass(\App\Core\Database::class);
-            $instanceProp = $reflection->getProperty('instance');
-            $instanceProp->setAccessible(true);
-            $instanceProp->setValue(null);
-            
-            $db = Database::getInstance();
-            $workflow = new \App\Services\DocumentWorkflowService();
-            
-            // We use a mock user (Officer/Staff) who is assigned to this department
-            // In a real test, we might fetch a real user assigned to this dept.
-            $stmt = $db->query("SELECT * FROM users WHERE department_id = :dept_id LIMIT 1", [':dept_id' => $doc['current_department_id']]);
-            $mockUserArray = $stmt->fetch();
-            if (!$mockUserArray) {
-                // Fallback to user ID 1
-                $mockUserArray = $db->query("SELECT * FROM users WHERE id = 1")->fetch();
-            }
-            
-            $mockUser = \App\Models\User::findById($mockUserArray['id']);
-            
-            echo "[Worker $i] Attempting to complete task...\n";
-            $workflow->completeTask($documentId, "Worker $i concurrent processing test", $mockUser, '123456');
-            
-            echo "✅ [Worker $i] SUCCESS: Task completed successfully.\n";
-        } catch (\Exception $e) {
-            echo "❌ [Worker $i] FAILED: " . $e->getMessage() . "\n";
-        }
-        exit(0);
-    }
+if ($doc['status'] !== 'processing') {
+    echo "❌ The document must be in 'processing' (received by a department) for this test.\n";
+    exit(1);
 }
 
-// Wait for all children to finish
-foreach ($pids as $pid) {
-    pcntl_waitpid($pid, $status);
+// A user of the department holding the current step (completeTask only accepts that department)
+$user = $db->query(
+    "SELECT id, email FROM users WHERE department_id = :dept_id AND deactivated_at IS NULL AND security_key_set_at IS NOT NULL ORDER BY id LIMIT 1",
+    [':dept_id' => $doc['current_department_id']]
+)->fetch();
+if (!$user) {
+    echo "❌ No active user with a signing key in the department holding this step.\n";
+    exit(1);
+}
+echo "Acting as: {$user['email']}\n";
+
+// Start all workers, then release them together 2 seconds from now
+$startAt = microtime(true) + 2.0;
+$env = getenv();
+$env['DTS_TEST_PIN'] = $pin; // passed via the environment, never on the command line
+$processes = [];
+$pipes = [];
+
+echo "\nStarting $numWorkers concurrent workers...\n";
+for ($i = 0; $i < $numWorkers; $i++) {
+    $processes[$i] = proc_open(
+        [PHP_BINARY, __FILE__, '--worker', (string) $documentId, (string) $user['id'], sprintf('%.6F', $startAt), (string) $i],
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes[$i],
+        null,
+        $env
+    );
+    if (!is_resource($processes[$i])) {
+        die("Could not start worker $i\n");
+    }
+    fclose($pipes[$i][0]);
+}
+
+// Collect each worker's output and wait for it to exit
+foreach ($processes as $i => $process) {
+    echo stream_get_contents($pipes[$i][1]);
+    $stderr = trim(stream_get_contents($pipes[$i][2]));
+    if ($stderr !== '') {
+        echo "   [Worker $i stderr] $stderr\n";
+    }
+    fclose($pipes[$i][1]);
+    fclose($pipes[$i][2]);
+    proc_close($process);
 }
 
 echo "\n🏁 Concurrency test completed.\n";
-echo "Checking Document state to ensure it only advanced ONE step, despite 5 concurrent requests...\n";
-
-// Reconnect in the parent
-$reflection = new \ReflectionClass(\App\Core\Database::class);
-$instanceProp = $reflection->getProperty('instance');
-$instanceProp->setAccessible(true);
-$instanceProp->setValue(null);
-$db = Database::getInstance();
+echo "Checking that the document advanced exactly ONE step despite $numWorkers concurrent requests...\n";
 
 $docAfter = $db->query("SELECT * FROM documents WHERE id = :id", [':id' => $documentId])->fetch();
+$newLogs = (int) $db->query(
+    "SELECT COUNT(*) AS c FROM document_logs WHERE document_id = :id AND action = 'Processing Complete' AND created_at >= FROM_UNIXTIME(:t)",
+    [':id' => $documentId, ':t' => (int) floor($startAt) - 1]
+)->fetch()['c'];
+
 echo "New Status: {$docAfter['status']}\n";
 echo "New Step: {$docAfter['current_step']}\n";
+echo "New 'Processing Complete' log entries: $newLogs\n";
 
 $expectedStep = $doc['current_step'] + 1;
-if ($docAfter['current_step'] == $expectedStep) {
-    echo "\n🎉 TEST PASSED! The FOR UPDATE lock perfectly prevented race conditions.\n";
-} else {
-    echo "\n⚠️ TEST FAILED! The document advanced multiple steps or state is corrupted.\n";
+if ((int) $docAfter['current_step'] === $expectedStep && $newLogs === 1) {
+    echo "\n🎉 TEST PASSED! Exactly one request won; the optimistic lock rejected the others.\n";
+    exit(0);
 }
+if ((int) $docAfter['current_step'] === (int) $doc['current_step']) {
+    echo "\n⚠️ TEST INCONCLUSIVE: no request succeeded. Check the PIN and the messages above.\n";
+    exit(1);
+}
+echo "\n⚠️ TEST FAILED! The document advanced more than one step or logged more than one completion.\n";
+exit(1);

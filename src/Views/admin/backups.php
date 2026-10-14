@@ -48,13 +48,10 @@
                         $backup['actions_html'] = sprintf('
                             <div class="flex justify-end items-center space-x-4">
                                 <a href="/system/backups/download/%s" class="text-accent-1 hover:text-accent-1-active">Download</a>
-                                <button type="button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-restore-file="%s">Restore</button>
-                                <form action="/system/backups/delete/%s" method="POST" class="confirm-action" data-message="Delete this backup?">
-                                    <input type="hidden" name="csrf_token" value="' . ($_SESSION['csrf_token'] ?? '') . '">
-                                    <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">Delete</button>
-                                </form>
+                                <button type="button" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" data-backup-action="restore" data-backup-file="%s">Restore</button>
+                                <button type="button" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300" data-backup-action="delete" data-backup-file="%s">Delete</button>
                             </div>
-                        ', urlencode($backup['file_name']), htmlspecialchars($backup['file_name'], ENT_QUOTES), urlencode($backup['file_name']));
+                        ', urlencode($backup['file_name']), htmlspecialchars($backup['file_name'], ENT_QUOTES), htmlspecialchars($backup['file_name'], ENT_QUOTES));
                     }
                     unset($backup);
 
@@ -76,22 +73,23 @@
     </div>
 </div>
 
-<!-- Restore Modal -->
-<div id="restore-modal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75">
+<!-- Restore / Delete Modal (PIN-confirmed) -->
+<div id="restore-modal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-75" role="dialog" aria-modal="true" aria-labelledby="restore-title" data-current-documents="<?= (int) $currentDocumentCount ?>">
     <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-xl max-w-md w-full">
-        <form id="restore-form" method="POST" class="confirm-action" data-message="Restore database?">
+        <form id="restore-form" method="POST">
     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
-            <h2 class="text-lg font-medium text-red-600 dark:text-red-400">FINAL WARNING: Restore Database?</h2>
+            <h2 id="restore-title" class="text-lg font-medium text-red-600 dark:text-red-400">FINAL WARNING: Restore Database?</h2>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Restore <strong id="restore-file-name"></strong>?
+                <span id="restore-verb">Restore</span> <strong id="restore-file-name"></strong>?
             </p>
+            <p id="restore-impact" class="mt-2 text-sm text-gray-600 dark:text-gray-400"></p>
             <div class="mt-4">
                 <label for="restore-pin" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Your Security PIN</label>
                 <input type="password" name="pin" id="restore-pin" required autocomplete="off" class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md shadow-sm sm:text-sm p-2 border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-accent-1 focus:border-accent-1">
             </div>
             <div class="mt-6 flex justify-end space-x-2">
                 <button type="button" id="restore-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-md transition">Cancel</button>
-                <button type="submit" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md transition">Restore Now</button>
+                <button type="submit" id="restore-submit-btn" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md transition">Restore Now</button>
             </div>
         </form>
     </div>

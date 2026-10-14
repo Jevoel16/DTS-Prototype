@@ -27,9 +27,7 @@ class RoleMiddleware
         // Verify active role membership against route permissions to prevent unauthorized access across role boundaries
         if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $roles)) {
             // Immediately abort request execution with HTTP 403 status to prevent unauthorized controller logic execution
-            header("HTTP/1.0 403 Forbidden");
-            echo "403 Forbidden: You do not have permission to access this page.";
-            exit;
+            render_error_page(403, 'Access denied', 'You do not have permission to open this page.');
         }
     }
 }

@@ -43,6 +43,15 @@
                                 'officer' => 'Officer',
                                 'staff' => 'Staff'
                             ]
+                        ],
+                        'status' => [
+                            'type' => 'select',
+                            'label' => 'Status',
+                            'options' => [
+                                'active' => 'Active',
+                                'deactivated' => 'Deactivated',
+                                'all' => 'All Accounts'
+                            ]
                         ]
                     ];
                     require BASE_PATH . '/src/Views/components/table-filters.php'; 
@@ -56,7 +65,7 @@
                             
                             $user['account_html'] = sprintf('
                                 <div class="flex items-center space-x-3">
-                                    <button data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none" title="Copy Email">
+                                    <button type="button" aria-label="Copy to clipboard" data-copy-text="%s" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none" title="Copy Email">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                         </svg>
@@ -90,11 +99,13 @@
 
                             // Align action links to the left to maintain visual alignment with the column header
                             $actions = sprintf('<a href="/users/%s/edit" class="text-accent-1 hover:text-accent-1-active">Edit</a>', $user['id']);
-                            if ($_SESSION['user_id'] != $user['id']) {
+                            if (!empty($user['deactivated_at'])) {
+                                $user['role_html'] .= ' <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 uppercase">Deactivated</span>';
+                            } elseif ($_SESSION['user_id'] != $user['id']) {
                                 $actions .= sprintf('
-                                    <form action="/users/%s/delete" method="POST" class="inline-block ml-2 confirm-action" data-message="Are you sure you want to delete this user?">
+                                    <form action="/users/%s/delete" method="POST" class="inline-block ml-2 confirm-action" data-message="Deactivate this user? They will no longer be able to sign in, but their history is kept.">
                                         <input type="hidden" name="csrf_token" value="' . ($_SESSION['csrf_token'] ?? '') . '">
-                                        <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+                                        <button type="submit" class="text-red-600 hover:text-red-900">Deactivate</button>
                                     </form>
                                 ', $user['id']);
                             }

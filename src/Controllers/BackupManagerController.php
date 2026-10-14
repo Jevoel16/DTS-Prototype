@@ -47,6 +47,9 @@ class BackupManagerController
             exit;
         }
 
+        // Shown in the restore dialog, so the admin can see how many documents a restore would drop
+        $currentDocumentCount = (int) Database::getInstance()->query("SELECT COUNT(*) AS c FROM documents")->fetch()['c'];
+
         require BASE_PATH . '/src/Views/admin/backups.php';
     }
 
@@ -89,9 +92,24 @@ class BackupManagerController
         $safeFileName = basename($fileName);
         $filePath = BASE_PATH . '/storage/app/backups/' . $safeFileName;
 
-        if (file_exists($filePath)) {
-            unlink($filePath);
+        // Deleting a backup can destroy the only copy of past data: require the admin's signing PIN
+        $pin = \App\Core\SecurityHelper::resolvePin($_POST['pin'] ?? '');
+        if (empty($pin) || !file_exists($filePath)) {
+            $_SESSION['error'] = 'Security PIN and an existing backup file are required.';
+            header('Location: /system/backups');
+            exit;
         }
+        try {
+            \App\Core\IntegrityManager::signAction((int) $_SESSION['user_id'], $pin, 'ADMIN: Delete backup', hash('sha256', $safeFileName));
+        } catch (\Exception $e) {
+            $_SESSION['error'] = $e->getMessage();
+            header('Location: /system/backups');
+            exit;
+        }
+
+        unlink($filePath);
+        \App\Core\SystemAudit::record('backup_deleted', ['file' => $safeFileName, 'user_id' => (int) $_SESSION['user_id']]);
+        $_SESSION['success'] = "Backup {$safeFileName} deleted.";
 
         header('Location: /system/backups');
         exit;
@@ -116,12 +134,13 @@ class BackupManagerController
             header('Location: /system/backups');
             exit;
         }
-        $payload = json_encode(['class' => \App\Jobs\RestoreBackupJob::class, 'data' => [$safeFileName]]);
+        \App\Core\SystemAudit::record('backup_restore_requested', ['file' => $safeFileName, 'user_id' => (int) $_SESSION['user_id']]);
+        $payload = json_encode(['class' => \App\Jobs\RestoreBackupJob::class, 'data' => [$safeFileName, (int) $_SESSION['user_id']]]);
         $db->query("INSERT INTO jobs (queue, payload, attempts, available_at, created_at) VALUES ('default', :payload, 0, UNIX_TIMESTAMP(), UNIX_TIMESTAMP())", [
             'payload' => $payload
         ]);
 
-        $_SESSION['success'] = 'Restore job has been queued and will be processed in the background.';
+        $_SESSION['success'] = 'Restore job has been queued. The current database is backed up automatically first, and you will be notified when the restore finishes.';
         header('Location: /system/backups');
         exit;
     }

@@ -95,4 +95,55 @@ if (!indexExists($db, $schema, 'departments', 'uniq_department_name')) {
     }
 }
 
+// 6. Chain seal: binds each document's workflow state and newest log entry (run `composer run seal` after)
+if (!columnExists($db, $schema, 'documents', 'chain_seal')) {
+    $db->query("ALTER TABLE documents ADD COLUMN chain_seal CHAR(64) NULL AFTER version");
+    echo "  + documents.chain_seal (now run: composer run seal)\n";
+}
+
+// 7. Users are deactivated, never deleted: their logs and key history must stay verifiable
+if (!columnExists($db, $schema, 'users', 'deactivated_at')) {
+    $db->query("ALTER TABLE users ADD COLUMN deactivated_at TIMESTAMP NULL AFTER remember_token");
+    echo "  + users.deactivated_at\n";
+}
+// 8. Forced password change: flag every account still using the seeded default password
+if (!columnExists($db, $schema, 'users', 'must_change_password')) {
+    $db->query("ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER deactivated_at");
+    echo "  + users.must_change_password\n";
+}
+$flagged = 0;
+foreach ($db->query("SELECT id, password FROM users WHERE must_change_password = 0")->fetchAll() as $row) {
+    if (password_verify('password', (string) $row['password'])) {
+        $db->query("UPDATE users SET must_change_password = 1 WHERE id = :id", ['id' => $row['id']]);
+        $flagged++;
+    }
+}
+if ($flagged) {
+    echo "  ! $flagged account(s) still use the default password; they must change it at next sign-in\n";
+}
+
+$restrictFks = [
+    ['document_logs', 'user_id'],
+    ['user_public_key_histories', 'user_id'],
+];
+foreach ($restrictFks as [$table, $column]) {
+    $fk = $db->query(
+        "SELECT rc.constraint_name AS name, rc.delete_rule AS rule
+         FROM information_schema.referential_constraints rc
+         JOIN information_schema.key_column_usage k
+           ON k.constraint_schema = rc.constraint_schema AND k.constraint_name = rc.constraint_name AND k.table_name = rc.table_name
+         WHERE rc.constraint_schema = :s AND rc.table_name = :t AND k.column_name = :c AND rc.referenced_table_name = 'users'",
+        ['s' => $schema, 't' => $table, 'c' => $column]
+    )->fetch();
+    if ($fk && $fk['rule'] === 'RESTRICT') {
+        echo "  = $table.$column foreign key already RESTRICT\n";
+        continue;
+    }
+    if ($fk) {
+        $db->query("ALTER TABLE `$table` DROP FOREIGN KEY `{$fk['name']}`");
+    }
+    $db->query("ALTER TABLE `$table` ADD CONSTRAINT `fk_{$table}_{$column}` FOREIGN KEY (`$column`) REFERENCES users(id) ON DELETE RESTRICT");
+    echo "  ~ $table.$column foreign key now ON DELETE RESTRICT\n";
+}
+
 echo "Done.\n";

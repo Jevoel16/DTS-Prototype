@@ -326,6 +326,15 @@ class DocumentWorkflowService
             $currentStepIndex = ((int)$document['current_step']) - 1;
             $currentDepartmentName = $route[$currentStepIndex]['name'] ?? 'Unknown';
 
+            // Only the department that owns the current step may complete it (officers and admins
+            // included), so the log line "Step processed by X" is always true
+            $userDept = $user->department_id
+                ? $db->query("SELECT name FROM departments WHERE id = :id", [':id' => $user->department_id])->fetch()
+                : null;
+            if (!$userDept || $userDept['name'] !== $currentDepartmentName) {
+                throw new Exception("This step belongs to {$currentDepartmentName}. Only that department can mark it complete.");
+            }
+
             $newStep = $document['current_step'] + 1;
             
             $nextDepartmentId = null;
@@ -428,28 +437,63 @@ class DocumentWorkflowService
     }
 
     /**
-     * Restores a frozen document to its last logical status state based on the cryptographic log.
+     * Status a document is in right after each workflow action. ADMIN:* entries and freezes are
+     * deliberately absent: they never define where a document is in its route.
+     */
+    private const STATUS_AFTER_ACTION = [
+        'Submitted' => 'pending',
+        'Accepted and Document Routing finalized' => 'in_transit',
+        'Received' => 'processing',
+        'Processing Complete' => 'in_transit',
+        'Ready for Releasing' => 'ready_for_release',
+        'Document Released' => 'completed',
+        'Document Declined' => 'declined',
+    ];
+
+    /**
+     * Newest workflow log entry of a document (skips freezes, unfreezes and other admin entries).
+     */
+    private function lastWorkflowLog(Database $db, int $documentId): ?array
+    {
+        $actions = array_keys(self::STATUS_AFTER_ACTION);
+        $placeholders = implode(',', array_fill(0, count($actions), '?'));
+        $log = $db->query(
+            "SELECT * FROM document_logs WHERE document_id = ? AND action IN ($placeholders) ORDER BY id DESC LIMIT 1",
+            array_merge([$documentId], $actions)
+        )->fetch();
+        return $log ?: null;
+    }
+
+    /**
+     * Restores a frozen document to the status recorded by its last workflow action.
      */
     public function unfreezeDocument(string $trackingCode, User $admin, string $pin): string
     {
         return $this->executeInTransaction('tracking_code', $trackingCode, $admin, 'unfreeze', function ($document, $db) use ($admin, $pin) {
-            $lastValidLog = $db->query("SELECT action FROM document_logs WHERE document_id = :id AND action != 'ADMIN: Document frozen.' AND action != 'System Auto-Freeze' ORDER BY id DESC LIMIT 1", [':id' => $document['id']])->fetch();
-            
-            $previousStatus = $document['status'];
-            if ($lastValidLog) {
-                $previousStatus = match($lastValidLog['action']) {
-                    'Submitted' => 'pending',
-                    'Accepted and Document Routing finalized' => 'in_transit',
-                    'Received' => 'processing',
-                    'Processing Complete' => 'in_transit',
-                    'Ready for Releasing' => 'ready_for_release',
-                    'Document Released' => 'completed',
-                    default => 'processing'
-                };
+            if ($document['status'] !== 'frozen') {
+                throw new Exception("This document is not frozen.");
             }
 
-            $stmt = $db->query("UPDATE documents SET status = :status, updated_at = NOW(), version = version + 1 WHERE id = :id AND version = :version", [
+            $lastWorkflowLog = $this->lastWorkflowLog($db, (int) $document['id']);
+            if (!$lastWorkflowLog) {
+                throw new Exception("No workflow history found to restore this document's status from.");
+            }
+            $previousStatus = self::STATUS_AFTER_ACTION[$lastWorkflowLog['action']];
+
+            // Restore the route position recorded by that action too, so a step or holder changed in the
+            // database while the document was frozen is not carried over. Only a verified snapshot is used.
+            $currentStep = $document['current_step'];
+            $currentDepartmentId = $document['current_department_id'];
+            $snapshot = json_decode((string) $lastWorkflowLog['document_snapshot'], true);
+            if (is_array($snapshot) && IntegrityManager::isTrustedSnapshot($lastWorkflowLog, $snapshot)) {
+                $currentStep = $snapshot['current_step'] ?? 0;
+                $currentDepartmentId = $snapshot['current_department_id'] ?? null;
+            }
+
+            $stmt = $db->query("UPDATE documents SET status = :status, current_step = :step, current_department_id = :dept, updated_at = NOW(), version = version + 1 WHERE id = :id AND version = :version", [
                 ':status' => $previousStatus,
+                ':step' => $currentStep,
+                ':dept' => $currentDepartmentId,
                 ':id' => $document['id'],
                 ':version' => $document['version']
             ]);
@@ -462,38 +506,37 @@ class DocumentWorkflowService
     }
 
     /**
-     * Fully recovers a tampered document by applying the last known-good data snapshot from the hash chain.
+     * Fully recovers a tampered document from the newest snapshot the hash chain can vouch for.
+     * A snapshot is only trusted when it hashes to its log's sealed state hash; the snapshot column
+     * itself is not part of the chain, so an unverified one could carry forged data.
      */
     public function autoResolveDocument(string $trackingCode, User $admin, string $pin): string
     {
         return $this->executeInTransaction('tracking_code', $trackingCode, $admin, 'unfreeze', function ($document, $db) use ($admin, $pin) {
-            // Tampered documents might not be in 'frozen' status if they were just flagged by verification
-            // and haven't triggered the Active Guard yet.
+            $actions = array_keys(self::STATUS_AFTER_ACTION);
+            $placeholders = implode(',', array_fill(0, count($actions), '?'));
+            $candidates = $db->query(
+                "SELECT * FROM document_logs WHERE document_id = ? AND action IN ($placeholders) AND document_snapshot IS NOT NULL ORDER BY id DESC",
+                array_merge([(int) $document['id']], $actions)
+            )->fetchAll();
 
-            // Find the most recent uncorrupted log entry that contains a full data snapshot
-            $stmt = $db->query("SELECT * FROM document_logs WHERE document_id = :id AND action != 'ADMIN: Document frozen.' AND action != 'System Auto-Freeze' AND document_snapshot IS NOT NULL ORDER BY id DESC LIMIT 1", [':id' => $document['id']]);
-            $lastValidLog = $stmt->fetch();
-            
-            if (!$lastValidLog || !$lastValidLog['document_snapshot']) {
-                throw new Exception("No valid document snapshot found to recover from.");
+            $trustedLog = null;
+            $snapshot = null;
+            foreach ($candidates as $log) {
+                $candidate = json_decode($log['document_snapshot'], true);
+                if (is_array($candidate) && IntegrityManager::isTrustedSnapshot($log, $candidate)) {
+                    $trustedLog = $log;
+                    $snapshot = $candidate;
+                    break;
+                }
+            }
+            if (!$trustedLog) {
+                throw new Exception("No verifiable snapshot found to recover from. Investigate this document manually.");
             }
 
-            $snapshot = json_decode($lastValidLog['document_snapshot'], true);
-            if (!$snapshot) {
-                throw new Exception("Document snapshot is corrupted or invalid.");
-            }
+            $previousStatus = self::STATUS_AFTER_ACTION[$trustedLog['action']];
 
-            $previousStatus = match($lastValidLog['action']) {
-                'Submitted' => 'pending',
-                'Accepted and Document Routing finalized' => 'in_transit',
-                'Received' => 'processing',
-                'Processing Complete' => 'in_transit',
-                'Ready for Releasing' => 'ready_for_release',
-                'Document Released' => 'completed',
-                default => 'processing'
-            };
-
-            // Overwrite the tampered row with the safe snapshot data, incrementing version to lock the recovery
+            // Overwrite the tampered row with the verified snapshot, incrementing version to lock the recovery
             $stmt = $db->query("UPDATE documents SET 
                 title = :title, 
                 guest_info = :guest_info, 
@@ -502,6 +545,8 @@ class DocumentWorkflowService
                 purpose_id = :purpose_id, 
                 finalized_route = :finalized_route, 
                 status = :status, 
+                current_step = :current_step,
+                current_department_id = :current_department_id,
                 updated_at = NOW(),
                 version = version + 1
                 WHERE id = :id AND version = :version", [
@@ -512,13 +557,16 @@ class DocumentWorkflowService
                 ':purpose_id' => $snapshot['purpose_id'] ?? null,
                 ':finalized_route' => empty($snapshot['finalized_route']) ? null : (is_array($snapshot['finalized_route']) ? json_encode($snapshot['finalized_route']) : $snapshot['finalized_route']),
                 ':status' => $previousStatus,
+                // The first ("Submitted") snapshot predates routing and has no step fields
+                ':current_step' => $snapshot['current_step'] ?? 0,
+                ':current_department_id' => $snapshot['current_department_id'] ?? null,
                 ':id' => $document['id'],
                 ':version' => $document['version']
             ]);
             if ($stmt->rowCount() === 0) throw new Exception("This document was just modified by another user. Please refresh.");
 
             $updatedDoc = $db->query("SELECT * FROM documents WHERE id = :id", [':id' => $document['id']])->fetch();
-            IntegrityManager::createLog($document['id'], $admin->id, 'ADMIN: Document Unfrozen & Restored', "An administrator has executed Auto-resolve, restoring the document from its last valid snapshot and returning status to " . ucfirst($previousStatus) . ".", $updatedDoc, $pin);
+            IntegrityManager::createLog($document['id'], $admin->id, 'ADMIN: Document Unfrozen & Restored', "An administrator has executed Auto-resolve, restoring the document from its last verified snapshot (log #{$trustedLog['id']}) and returning status to " . ucfirst($previousStatus) . ".", $updatedDoc, $pin);
             
             return $previousStatus;
         });

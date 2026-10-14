@@ -60,7 +60,7 @@ ob_start(); ?>
                                     $job['error_html'] = sprintf(
                                         '<div class="flex items-start justify-between gap-2 group">
                                             <div class="text-xs text-red-600 dark:text-red-400 line-clamp-3 break-words" title="%s">%s</div>
-                                            <button data-copy-text="%s" class="text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors focus:outline-none shrink-0 mt-0.5" title="Copy Error Stack Trace">
+                                            <button type="button" aria-label="Copy to clipboard" data-copy-text="%s" class="text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors focus:outline-none shrink-0 mt-0.5" title="Copy Error Stack Trace">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                 </svg>

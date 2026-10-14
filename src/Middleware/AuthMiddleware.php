@@ -44,7 +44,7 @@ class AuthMiddleware
 
         // Re-read the account every request so deletions, role changes and key resets apply immediately
         $db = Database::getInstance();
-        $user = $db->query("SELECT role, department_id, security_key_set_at FROM users WHERE id = :id", ['id' => $_SESSION['user_id']])->fetch();
+        $user = $db->query("SELECT role, department_id, security_key_set_at, must_change_password FROM users WHERE id = :id AND deactivated_at IS NULL", ['id' => $_SESSION['user_id']])->fetch();
         if (!$user) {
             $this->endSession("Your account is no longer active.");
         }
@@ -58,8 +58,26 @@ class AuthMiddleware
             session_write_close();
         }
 
+        // A temporary or default password (new accounts, admin resets, seeded accounts) must be replaced
+        // before anything else; only the change-password page and logout stay reachable
+        $mustChangePassword = !empty($user['must_change_password']);
+        $_SESSION['must_change_password'] = $mustChangePassword;
+        if ($mustChangePassword && $uri !== '/account/password' && $uri !== '/logout') {
+            if (str_starts_with($uri, '/api/')) {
+                http_response_code(403);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Please change your password first.']);
+                exit;
+            }
+            if ($method === 'POST') {
+                $_SESSION['error'] = "Please change your password first.";
+            }
+            header("Location: /account/password");
+            exit;
+        }
+
         // Enforce mandatory security key setup for all routes except the key setup page and logout endpoint
-        if ($uri !== '/security-key' && $uri !== '/logout') {
+        if ($uri !== '/security-key' && $uri !== '/logout' && $uri !== '/account/password') {
             // Check if user has initialized their cryptographic signing keys
             $needsKey = is_null($user['security_key_set_at']);
             $_SESSION['needs_security_key'] = $needsKey;

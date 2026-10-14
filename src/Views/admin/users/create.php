@@ -50,6 +50,16 @@
                             </select>
                         </div>
 
+                        <div>
+                            <label for="department_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Department (required for Staff and Records Officers)</label>
+                            <select name="department_id" id="department_id" class="mt-1 block w-full border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:border-accent-1 focus:ring-accent-1 sm:text-sm p-2 border">
+                                <option value="">None (Admin)</option>
+                                <?php foreach ($departments as $department): ?>
+                                    <option value="<?= (int) $department['id'] ?>"><?= e($department['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
                     </div>
                     
                     <div class="mt-6 flex items-center justify-end">

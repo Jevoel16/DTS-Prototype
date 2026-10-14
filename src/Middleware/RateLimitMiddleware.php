@@ -29,7 +29,7 @@ class RateLimitMiddleware
             header('Content-Type: application/json');
             echo json_encode(['status' => 'error', 'message' => 'Too many requests. Please try again later.']);
         } else {
-            echo "429 Too Many Requests: please wait " . ceil($retryAfter / 60) . " minute(s) and try again.";
+            render_error_page(429, 'Too many requests', 'Please wait ' . ceil($retryAfter / 60) . ' minute(s) and try again.');
         }
         exit;
     }

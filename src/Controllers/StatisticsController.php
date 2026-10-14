@@ -46,15 +46,17 @@ class StatisticsController
             $db = Database::getInstance();
             $jobId = bin2hex(random_bytes(16));
             $userId = $_SESSION['user_id'];
-            $filtersJson = json_encode($_POST);
-            
+            // Only the known filter fields are stored (never the CSRF token or other form noise)
+            $filters = \App\Services\ReleasedReportQuery::sanitizeFilters($_POST);
+            $filtersJson = json_encode($filters);
+
             $db->query("INSERT INTO report_jobs (id, user_id, status, progress, total_documents, filters, created_at, updated_at) VALUES (:id, :uid, 'queued', 0, 0, :filters, NOW(), NOW())", [
                 'id' => $jobId,
                 'uid' => $userId,
                 'filters' => $filtersJson
             ]);
 
-            $payload = json_encode(['class' => \App\Jobs\GenerateReportJob::class, 'data' => [$jobId, $userId, $_POST]]);
+            $payload = json_encode(['class' => \App\Jobs\GenerateReportJob::class, 'data' => [$jobId, $userId, $filters]]);
             $db->query("INSERT INTO jobs (queue, payload, attempts, available_at, created_at) VALUES ('default', :payload, 0, UNIX_TIMESTAMP(), UNIX_TIMESTAMP())", [
                 'payload' => $payload
             ]);
@@ -62,8 +64,9 @@ class StatisticsController
             echo json_encode(['status' => 'success', 'message' => 'Report generation started.', 'job_id' => $jobId]);
             exit;
         } catch (\Throwable $e) {
+            error_log("Report queueing failed: " . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            echo json_encode(['status' => 'error', 'message' => 'The report could not be queued. Please try again.']);
             exit;
         }
     }
@@ -181,14 +184,20 @@ class StatisticsController
                 $guestName = $gi['name'] ?? 'N/A';
             }
             
-            $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([
+            // Guest-supplied text is written as plain string cells: Row::fromValues() would turn
+            // a value starting with "=" into a live formula (spreadsheet formula injection)
+            $values = [
                 $doc['tracking_code'],
                 $doc['title'],
                 $doc['purpose_name'],
                 $doc['district'],
                 $guestName,
                 $doc['updated_at']
-            ]));
+            ];
+            $writer->addRow(new \OpenSpout\Common\Entity\Row(array_map(
+                fn ($value) => new \OpenSpout\Common\Entity\Cell\StringCell((string) ($value ?? '')),
+                $values
+            )));
         }
 
         $writer->close();

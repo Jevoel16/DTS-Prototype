@@ -41,7 +41,7 @@
                             <p class="flex items-center">
                                 <strong>Tracking Code:</strong> 
                                 <span class="ml-1"><?php echo htmlspecialchars($document['tracking_code']); ?></span>
-                                <button data-copy-text="<?php echo htmlspecialchars($document['tracking_code']); ?>" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none ml-2" title="Copy Tracking Code">
+                                <button type="button" aria-label="Copy to clipboard" data-copy-text="<?php echo htmlspecialchars($document['tracking_code']); ?>" class="text-gray-400 hover:text-accent-1 transition-colors focus:outline-none ml-2" title="Copy Tracking Code">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="copy-icon h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>

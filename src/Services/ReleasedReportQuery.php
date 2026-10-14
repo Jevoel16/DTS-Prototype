@@ -10,6 +10,26 @@ namespace App\Services;
 class ReleasedReportQuery
 {
     /**
+     * Keep only the supported filter fields, as trimmed strings; drop a malformed date.
+     *
+     * @return array<string, string>
+     */
+    public static function sanitizeFilters(array $input): array
+    {
+        $filters = [];
+        foreach (['date', 'purpose', 'submitter', 'search'] as $key) {
+            $value = $input[$key] ?? '';
+            if (is_string($value) && trim($value) !== '') {
+                $filters[$key] = mb_substr(trim($value), 0, 190);
+            }
+        }
+        if (isset($filters['date']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['date'])) {
+            unset($filters['date']);
+        }
+        return $filters;
+    }
+
+    /**
      * @return array{from: string, where: string, params: array}
      */
     public static function build(int $departmentId, string $jobCreatedAt, array $filters): array

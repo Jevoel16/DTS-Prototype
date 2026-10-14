@@ -111,10 +111,7 @@
             if (closer.classList.contains('close-modal-backdrop') && e.target !== closer) return;
             var modal = document.getElementById(closer.dataset.modal);
             if (modal) {
-                modal.classList.add('hidden');
-                if (closer.dataset.modal === 'global-confirmation-modal') {
-                    activeConfirmForm = null;
-                }
+                closeGenericModal(modal);
             }
             return;
         }
@@ -123,7 +120,41 @@
         if (opener && opener.dataset.modal) {
             e.preventDefault();
             var target = document.getElementById(opener.dataset.modal);
-            if (target) target.classList.remove('hidden');
+            if (target) {
+                target.classList.remove('hidden');
+                modalReturnFocus = opener;
+                focusFirstField(target);
+            }
+        }
+    });
+
+    // Keyboard users: focus moves into an opened modal, Escape closes it (only modals that offer a
+    // close button; the forced key-setup dialog has none), and focus returns to the opener
+    var modalReturnFocus = null;
+
+    function focusFirstField(modal) {
+        var field = modal.querySelector('input:not([type="hidden"]), select, textarea, button:not(.close-modal-btn)');
+        if (field) setTimeout(function () { field.focus(); }, 0);
+    }
+
+    function closeGenericModal(modal) {
+        modal.classList.add('hidden');
+        if (modal.id === 'global-confirmation-modal') {
+            activeConfirmForm = null;
+        }
+        if (modalReturnFocus && document.contains(modalReturnFocus)) {
+            modalReturnFocus.focus();
+        }
+        modalReturnFocus = null;
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        var open = Array.prototype.filter.call(document.querySelectorAll('[role="dialog"]'), function (m) {
+            return !m.classList.contains('hidden') && m.querySelector('.close-modal-btn');
+        });
+        if (open.length) {
+            closeGenericModal(open[open.length - 1]);
         }
     });
 

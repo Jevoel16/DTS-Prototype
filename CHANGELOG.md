@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased (audit fixes, see `documentation/AUDIT_REPORT_2026-10.md`)
+
+**Upgrade:** run `composer run migrate`, then `composer run seal`. Everyone signs in again once (sessions moved to `storage/sessions`), and accounts still on the default password must choose a new one.
+
+### Security
+- **Chain seal** (`documents.chain_seal`): a keyed seal over each document's workflow state and the head of its log chain. Status changes, skipped steps and deleted newest log entries made directly in the database are now detected by the Active Guard and the integrity scan. Automatic freezes keep the evidence flagged until an admin resolves it.
+- **Auto-resolve** only restores from a snapshot that verifies against its sealed log entry (it used to trust the unhashed snapshot). Unfreeze also restores the step and holder from that verified snapshot.
+- **Rebuild Chain** refuses entries whose signature does not verify, and refuses when the live data does not match the newest entry. System log entries are now signed with an HMAC under `APP_INTEGRITY_KEY`.
+- Users are **deactivated instead of deleted** (`users.deactivated_at`; log and key-history foreign keys are `ON DELETE RESTRICT`), so their signed history stays verifiable. Deactivated users are signed out and cannot sign in.
+- **Forced password change** for seeded accounts and admin-set passwords, plus self-service *Change Password* (`/account/password`).
+- Staff can no longer print the tracking form (with the citizen's contact details) of documents outside their department.
+- Spreadsheet reports write guest text as plain text (no formula injection); report filters are whitelisted (the CSRF token is no longer stored).
+- Response cache ignores URLs with query strings (unauthenticated disk-filling).
+- Login runs one bcrypt check even for unknown usernames (no timing enumeration).
+- `X-Powered-By` removed; the PHP development server now sends CSP and the other security headers.
+- Admin debug modal inserts database values as text, not HTML.
+- Backup restore and delete require the admin's PIN; every restore first saves a `pre-restore` backup and is written to the new keyed, append-only `storage/logs/system-audit.log`, and the admin is notified of how many documents changed.
+- `seed:prod` refuses to wipe an existing DTS database without `--force`; seeders only clear this app's session folder.
+
+### Fixed
+- Unfreezing a declined document, or unfreezing a document a second time, left it in an impossible `processing` state.
+- Officers and admins could complete another department's step, and the log credited that department.
+- Admins could not assign a department when creating or editing users. Records Officers must belong to the Records Unit.
+- *Freeze All* reported "Successfully frozen 0 documents" on a wrong or locked PIN.
+- Backups no longer include `jobs`, `rate_limits` and `cache`; the worker moves jobs left reserved for over 30 minutes to failed jobs.
+- Backup file names include the real database name; `BACKUP_KEEP` sets retention.
+- Literal `<br>` in validation errors; login error said "Email" for the Username field; double-escaped "not found" message; tracking-code placeholder length; the Users role filter "All Roles" returned nothing.
+- Intake finalize/decline routes limited to Records Officers, matching the intake pages.
+- `scripts/concurrency_test.php` runs on Windows (worker processes via `proc_open` instead of `pcntl_fork`, released at a shared start time) and takes the signing PIN as an argument; it used a hard-coded invalid PIN and could never pass.
+
+### Changed
+- Department metrics backfill runs every 5 minutes (was 30), so statistics charts stay close to live.
+- Separate rate-limit buckets for tracking lookups and status polling; styled 403/404/429 pages.
+- Accessibility: dialog roles and labels, focus handling and Escape for modals, names for icon-only buttons, heading order, autocomplete hints on the guest form.
+- Integrity verification code is shared (`IntegrityManager`) instead of duplicated in the scan job and debug view.
+
 ## 2026-10-12 16:45
 
 **Version:** 1.25.0-Release+202610121645

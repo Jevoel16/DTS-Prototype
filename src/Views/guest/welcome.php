@@ -1,26 +1,26 @@
 <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-    <div class="bg-primary text-white p-4 font-semibold text-lg">
+    <h2 class="bg-primary text-white p-4 font-semibold text-lg">
         Start a New Document Request
-    </div>
+    </h2>
     <div class="p-4 sm:p-6">
         <form method="POST" action="/submit-document">
     <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
             
             <div class="mb-5">
                 <label for="guest_name" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Your Full Name</label>
-                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('guest_name') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_name" name="guest_name" maxlength="120" value="<?= old('guest_name') ?>" required>
+                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('guest_name') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_name" name="guest_name" autocomplete="name" maxlength="120" value="<?= old('guest_name') ?>" required>
                 <?php if (has_error('guest_name')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('guest_name') ?></p><?php endif; ?>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
                 <div>
                     <label for="guest_email" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Your Email Address (Optional)</label>
-                    <input type="email" class="w-full px-4 py-2 border <?= field_error_class('guest_email') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_email" name="guest_email" value="<?= old('guest_email') ?>">
+                    <input type="email" class="w-full px-4 py-2 border <?= field_error_class('guest_email') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_email" name="guest_email" autocomplete="email" value="<?= old('guest_email') ?>">
                     <?php if (has_error('guest_email')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('guest_email') ?></p><?php endif; ?>
                 </div>
                 <div>
                     <label for="guest_phone" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Your Phone Number</label>
-                    <input type="text" class="w-full px-4 py-2 border <?= field_error_class('guest_phone') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_phone" name="guest_phone" inputmode="numeric" value="<?= old('guest_phone') ?>" required>
+                    <input type="text" class="w-full px-4 py-2 border <?= field_error_class('guest_phone') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="guest_phone" name="guest_phone" autocomplete="tel" inputmode="numeric" value="<?= old('guest_phone') ?>" required>
                     <?php if (has_error('guest_phone')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('guest_phone') ?></p><?php endif; ?>
                 </div>
             </div>
@@ -58,7 +58,7 @@
 
             <div class="mb-5">
                 <label for="title" class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Document Title</label>
-                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('title') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="title" name="title" maxlength="140" value="<?= old('title') ?>" required placeholder="N/A if inapplicable.">
+                <input type="text" class="w-full px-4 py-2 border <?= field_error_class('title') ?> rounded-md focus:outline-none focus:ring-2 focus:ring-primary dark:bg-gray-700 dark:text-white" id="title" name="title" maxlength="140" value="<?= old('title') ?>" required placeholder="e.g. Service Record request for Juan Dela Cruz">
                 <?php if (has_error('title')): ?><p class="mt-1 text-xs text-red-600 dark:text-red-400 font-medium"><?= error_msg('title') ?></p><?php endif; ?>
             </div>
 
@@ -107,7 +107,7 @@
 <div id="track-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
     <div class="relative mx-auto p-5 border w-full max-w-sm shadow-lg rounded-md bg-white dark:bg-gray-800 dark:border-gray-700">
         <div class="mt-3 text-center">
-            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Track a Document</h3>
+            <h2 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Track a Document</h2>
             <form id="track-document-form" class="mt-4">
                 <div class="mb-4 text-left">
                     <label for="tracking_code_input" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Enter Tracking Code:</label>
@@ -141,7 +141,7 @@
     <div class="qr-modal-content">
         <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
             <h3 class="text-lg font-medium">Scan QR Code</h3>
-            <button id="close-qr-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <button type="button" id="close-qr-modal" aria-label="Close QR scanner" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
